@@ -7,4 +7,7 @@ esbuild.build({
   format: "esm",
   outfile: "dist/server.js",
   external: ["express", "yahoo-finance2", "@google/genai", "vite", "dotenv"],
+  banner: {
+    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+  },
 }).catch(() => process.exit(1));
