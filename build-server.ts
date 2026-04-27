@@ -6,5 +6,5 @@ esbuild.build({
   target: "node20",
   format: "esm",
   outfile: "dist/server.js",
-  external: ["express", "yahoo-finance2", "@google/genai", "vite"],
+  external: ["express", "yahoo-finance2", "@google/genai", "vite", "dotenv"],
 }).catch(() => process.exit(1));
