@@ -1,3 +1,7 @@
+export type Sentiment = 'High' | 'Mild' | 'Low';
+export type ChartTimeframe = '1m' | '3m' | '6m' | '1y';
+export type ActiveTab = 'portfolio' | 'watchlist' | 'discover';
+
 export interface Stock {
   symbol: string;
   name: string;
@@ -37,10 +41,11 @@ export interface PricePoint {
 }
 
 export interface AIAnalysis {
-  sentiment: 'High' | 'Mild' | 'Low' | 'bullish' | 'bearish' | 'neutral';
+  sentiment: Sentiment;
   priceTarget: number;
   buyInPrice: number;
   sellingPrice: number;
+  cutLossPrice: number;
   confidence: number;
   summary: string;
   risks: string[];
@@ -57,7 +62,7 @@ export interface Recommendation {
   name: string;
   market: 'US' | 'HK' | 'ETF';
   reason: string;
-  indicator: 'High' | 'Mild' | 'Low' | 'bullish' | 'bearish' | 'neutral';
+  indicator: Sentiment;
   technicals?: {
     rsi: string | number;
     macd: string;
