@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and subscription data",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "isSubscribed": { "type": "boolean", "description": "Whether the user has access to AI analysis features" },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "updatedAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["email", "isSubscribed", "createdAt"]
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "A single stock holding in a user's portfolio",
+      "type": "object",
+      "properties": {
+        "symbol": { "type": "string" },
+        "shares": { "type": "number" },
+        "averagePrice": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["symbol", "shares", "averagePrice", "totalCost", "updatedAt"]
+    },
+    "WatchlistItem": {
+      "title": "Watchlist Item",
+      "description": "A stock symbol being watched by the user",
+      "type": "object",
+      "properties": {
+        "symbol": { "type": "string" },
+        "addedAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["symbol", "addedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile document"
+    },
+    "/users/{userId}/portfolio/{symbol}": {
+      "schema": { "$ref": "#/entities/PortfolioItem" },
+      "description": "The user's portfolio stock holdings"
+    },
+    "/users/{userId}/watchlist/{symbol}": {
+      "schema": { "$ref": "#/entities/WatchlistItem" },
+      "description": "The user's watched stock symbols"
+    }
+  }
+}

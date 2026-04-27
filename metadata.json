@@ -1,0 +1,6 @@
+{
+  "name": "StockTracker AI",
+  "description": "A personal stock portfolio & watchlist tracker with AI-powered price targets and analysis powered by Google Gemini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
