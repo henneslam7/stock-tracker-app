@@ -38,7 +38,7 @@ async function startServer() {
     try {
       const query = req.query.q as string;
       if (!query) return res.json([]);
-      const result = await yahooFinance.search(query, { quotesCount: 6, newsCount: 0 });
+      const result = await yahooFinance.search(query, { quotesCount: 6, newsCount: 0 }, { validateResult: false });
       // @ts-ignore
       res.json(result.quotes.filter((q: any) => ['EQUITY','ETF','INDEX'].includes(q.quoteType)));
     } catch (e: any) {
@@ -51,7 +51,7 @@ async function startServer() {
     try {
       const symbols = ((req.query.symbols as string) || '').split(',').filter(Boolean);
       if (symbols.length === 0) return res.json([]);
-      const result = await yahooFinance.quote(symbols);
+      const result = await yahooFinance.quote(symbols, {}, { validateResult: false });
       res.json(Array.isArray(result) ? result : [result]);
     } catch (e: any) {
       console.error('Quote error:', e.message);
@@ -65,23 +65,23 @@ async function startServer() {
       const period = (req.query.period as string) || '1m';
       const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG['1m'];
 
-      const quote = await yahooFinance.quote(symbol);
+      const quote = await yahooFinance.quote(symbol, {}, { validateResult: false });
       const now = new Date();
       const period1 = new Date(now.getFullYear(), now.getMonth() - config.months, now.getDate());
 
       let chart: any[] = [];
-      try { chart = await yahooFinance.historical(symbol, { period1, period2: now, interval: config.interval }); }
+      try { chart = await yahooFinance.historical(symbol, { period1, period2: now, interval: config.interval }, { validateResult: false }); }
       catch (err) { console.error("Chart fetch error for", symbol, err); }
 
       let news: any[] = [];
       try {
-        const searchData = await yahooFinance.search(symbol, { newsCount: 5, quotesCount: 0 });
+        const searchData = await yahooFinance.search(symbol, { newsCount: 5, quotesCount: 0 }, { validateResult: false });
         // @ts-ignore
         news = searchData.news || [];
       } catch (err) { console.error("News fetch error:", err); }
 
       let quoteSummary = null;
-      try { quoteSummary = await yahooFinance.quoteSummary(symbol, { modules: ['financialData','defaultKeyStatistics','summaryDetail'] }); }
+      try { quoteSummary = await yahooFinance.quoteSummary(symbol, { modules: ['financialData','defaultKeyStatistics','summaryDetail'] }, { validateResult: false }); }
       catch (err) { console.error("QuoteSummary fetch error:", err); }
 
       res.json({ quote, chart, news, quoteSummary });

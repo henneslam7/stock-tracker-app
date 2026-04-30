@@ -62,7 +62,7 @@ export default function App() {
       if (symbols.length === 0) return;
       try {
         const data = await StockService.getStocksData(symbols);
-        setPrices(data);
+        if (Object.keys(data).length > 0) setPrices(data);
       } catch { /* swallow */ }
     };
     fetch();
