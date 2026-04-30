@@ -1,5 +1,4 @@
 import { Activity, PieChart as PieChartIcon, List, Compass, Search, RefreshCw } from "lucide-react";
-import { User } from "firebase/auth";
 import { cn } from "../lib/utils";
 import { ActiveTab } from "../types";
 
@@ -9,12 +8,9 @@ interface SidebarProps {
   onLoadRecommendations: () => void;
   onSearchFocus: () => void;
   onRefresh: () => void;
-  user: User | null;
-  onUserClick: () => void;
-  onLogout: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearchFocus, onRefresh, user, onUserClick, onLogout }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearchFocus, onRefresh }: SidebarProps) {
   const navItems = [
     { tab: 'portfolio' as ActiveTab, icon: PieChartIcon, title: 'Portfolio' },
     { tab: 'watchlist' as ActiveTab, icon: List, title: 'Watchlist' },
@@ -61,7 +57,7 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
         </button>
       </div>
 
-      <div className="mt-auto flex flex-col gap-6 items-center">
+      <div className="mt-auto">
         <button
           onClick={onRefresh}
           className="p-3 text-slate-500 hover:text-white hover:rotate-180 transition-all duration-500"
@@ -69,19 +65,6 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
         >
           <RefreshCw size={24} />
         </button>
-        <div
-          onClick={user ? onLogout : onUserClick}
-          title={user ? user.email || 'Logged in' : 'Login'}
-          className={cn(
-            "w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-400 font-bold overflow-hidden cursor-pointer hover:border-white/30 transition-colors",
-            user ? "border-emerald-500/50" : ""
-          )}
-        >
-          <img
-            src={user?.photoURL ?? `https://api.dicebear.com/7.x/initials/svg?seed=${user?.email ?? 'Guest'}`}
-            alt="User"
-          />
-        </div>
       </div>
     </nav>
   );

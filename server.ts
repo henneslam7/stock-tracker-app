@@ -5,44 +5,12 @@ import { fileURLToPath } from 'url';
 import YahooFinance from 'yahoo-finance2';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
-import Stripe from 'stripe';
-import { initializeApp as adminInitApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
 
 console.log("Starting server process...");
 dotenv.config();
 
-// ── Firebase Admin ───────────────────────────────────────────────────────────
-let adminDb: any = null;
-let adminAuth: any = null;
-
-if (!getApps().length && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-  try {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    const adminApp = adminInitApp({ credential: cert(serviceAccount) });
-    adminAuth = getAuth(adminApp);
-    adminDb = getFirestore(adminApp, process.env.FIRESTORE_DATABASE_ID || '(default)');
-  } catch (e) {
-    console.error('Firebase Admin init error:', e);
-  }
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 const yahooFinance = new YahooFinance({ queue: { concurrency: 4 } });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-function getGeminiClient() {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error('GEMINI_API_KEY not set');
-  return new GoogleGenAI({ apiKey: key });
-}
-
-function getStripe(): Stripe {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error('STRIPE_SECRET_KEY not set');
-  return new Stripe(key);
-}
 
 const PERIOD_CONFIG: Record<string, { months: number; interval: '1d' | '1wk' }> = {
   '1m': { months: 1,  interval: '1d' },
@@ -51,31 +19,10 @@ const PERIOD_CONFIG: Record<string, { months: number; interval: '1d' | '1wk' }> 
   '1y': { months: 12, interval: '1wk' },
 };
 
-// ── Auth middleware ───────────────────────────────────────────────────────────
-async function verifyToken(req: any, res: any, next: any) {
-  if (!adminAuth) return res.status(503).json({ error: 'Auth service not configured' });
-  const header = req.headers.authorization as string | undefined;
-  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing auth token' });
-  try {
-    const decoded = await adminAuth.verifyIdToken(header.slice(7));
-    req.uid = decoded.uid;
-    req.email = decoded.email;
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-}
-
-async function requireSubscription(req: any, res: any, next: any) {
-  if (req.email === process.env.OWNER_EMAIL) return next();
-  if (!adminDb) return res.status(503).json({ error: 'DB not configured' });
-  try {
-    const snap = await adminDb.doc(`users/${req.uid}`).get();
-    if (snap.exists && snap.data()?.isSubscribed) return next();
-  } catch (e) {
-    console.error('Subscription check error:', e);
-  }
-  res.status(403).json({ error: 'Subscription required' });
+function getGeminiClient() {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error('GEMINI_API_KEY not set');
+  return new GoogleGenAI({ apiKey: key });
 }
 
 async function startServer() {
@@ -83,56 +30,9 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
 
-  // Stripe webhook needs raw body — must be registered BEFORE express.json()
-  app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req: any, res: any) => {
-    const sig = req.headers['stripe-signature'];
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!secret) return res.status(500).json({ error: 'Webhook secret not configured' });
-
-    let event: Stripe.Event;
-    try {
-      event = getStripe().webhooks.constructEvent(req.body, sig, secret);
-    } catch (e: any) {
-      console.error('Webhook signature error:', e.message);
-      return res.status(400).send(`Webhook Error: ${e.message}`);
-    }
-
-    try {
-      if (event.type === 'checkout.session.completed') {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const uid = session.metadata?.uid;
-        if (uid && adminDb) {
-          await adminDb.doc(`users/${uid}`).update({
-            isSubscribed: true,
-            stripeCustomerId: session.customer,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
-      } else if (
-        event.type === 'customer.subscription.deleted' ||
-        event.type === 'invoice.payment_failed'
-      ) {
-        const obj = event.data.object as any;
-        const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id;
-        if (customerId && adminDb) {
-          const snap = await adminDb.collection('users')
-            .where('stripeCustomerId', '==', customerId)
-            .limit(1).get();
-          for (const doc of snap.docs) {
-            await doc.ref.update({ isSubscribed: false, updatedAt: FieldValue.serverTimestamp() });
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Webhook processing error:', e);
-    }
-
-    res.json({ received: true });
-  });
-
   app.use(express.json({ limit: '2mb' }));
 
-  // ── Stock APIs ───────────────────────────────────────────────────────────────
+  // ── Stock APIs ───────────────────────────────────────────────────────────
 
   app.get('/api/search', async (req: any, res: any) => {
     try {
@@ -191,50 +91,9 @@ async function startServer() {
     }
   });
 
-  // ── Stripe APIs ──────────────────────────────────────────────────────────────
+  // ── Gemini AI APIs ────────────────────────────────────────────────────────
 
-  app.post('/api/stripe/create-checkout', verifyToken, async (req: any, res: any) => {
-    try {
-      const priceId = process.env.STRIPE_PRICE_ID;
-      if (!priceId) return res.status(500).json({ error: 'STRIPE_PRICE_ID not configured' });
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      const session = await getStripe().checkout.sessions.create({
-        mode: 'subscription',
-        payment_method_types: ['card'],
-        line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${appUrl}?subscription=success`,
-        cancel_url: `${appUrl}?subscription=cancel`,
-        customer_email: req.email,
-        metadata: { uid: req.uid },
-      });
-      res.json({ url: session.url });
-    } catch (e: any) {
-      console.error('Checkout error:', e.message);
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post('/api/stripe/portal', verifyToken, async (req: any, res: any) => {
-    try {
-      if (!adminDb) return res.status(503).json({ error: 'DB not configured' });
-      const snap = await adminDb.doc(`users/${req.uid}`).get();
-      const customerId = snap.data()?.stripeCustomerId;
-      if (!customerId) return res.status(400).json({ error: 'No Stripe subscription found' });
-      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-      const session = await getStripe().billingPortal.sessions.create({
-        customer: customerId,
-        return_url: appUrl,
-      });
-      res.json({ url: session.url });
-    } catch (e: any) {
-      console.error('Portal error:', e.message);
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // ── Gemini AI APIs (subscription-gated) ─────────────────────────────────────
-
-  app.post('/api/analyze', verifyToken, requireSubscription, async (req: any, res: any) => {
+  app.post('/api/analyze', async (req: any, res: any) => {
     try {
       const { stock, historicalData, news, quoteSummary, userEntryPrice } = req.body;
       const ai = getGeminiClient();
@@ -296,7 +155,7 @@ Output JSON (no markdown):
     }
   });
 
-  app.get('/api/recommendations', verifyToken, requireSubscription, async (_req: any, res: any) => {
+  app.get('/api/recommendations', async (_req: any, res: any) => {
     try {
       const ai = getGeminiClient();
 
@@ -329,7 +188,7 @@ Output pure JSON array, no markdown. 'reason' must be in Cantonese.
     }
   });
 
-  // ── Static / SPA ─────────────────────────────────────────────────────────────
+  // ── Static / SPA ──────────────────────────────────────────────────────────
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });

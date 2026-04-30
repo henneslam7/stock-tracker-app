@@ -1,27 +1,22 @@
 import { RefObject } from "react";
 import { Search, Plus, X } from "lucide-react";
-import { User } from "firebase/auth";
 import { cn } from "../lib/utils";
 import { Stock } from "../types";
 
 interface HeaderProps {
   marketStatus: { us: string; hk: string };
-  isSubscribed: boolean;
-  user: User | null;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   searchResults: any[];
   prices: Record<string, Stock>;
   watchlist: string[];
   onToggleWatchlist: (symbol: string) => void;
-  onSubscriptionClick: () => void;
   searchInputRef: RefObject<HTMLInputElement>;
 }
 
 export function Header({
-  marketStatus, isSubscribed, searchQuery, onSearchChange,
-  searchResults, prices, watchlist, onToggleWatchlist,
-  onSubscriptionClick, searchInputRef
+  marketStatus, searchQuery, onSearchChange,
+  searchResults, prices, watchlist, onToggleWatchlist, searchInputRef
 }: HeaderProps) {
   return (
     <div className="flex-none flex items-center justify-between px-2">
@@ -49,21 +44,12 @@ export function Header({
           </div>
         </div>
 
-        {/* Subscription status */}
-        <div
-          onClick={onSubscriptionClick}
-          className="flex items-center gap-4 bg-surface border border-line px-5 py-3 rounded-[1.5rem] cursor-pointer hover:border-white/20 transition-colors"
-          title="Manage Subscription"
-        >
+        {/* AI Engine status */}
+        <div className="flex items-center gap-4 bg-surface border border-line px-5 py-3 rounded-[1.5rem]">
           <span className="text-[10px] text-slate-500 uppercase font-black tracking-widest leading-none">AI Engine</span>
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-2 h-2 rounded-full shadow-lg",
-              isSubscribed ? "bg-blue-500 shadow-blue-500/80 animate-pulse" : "bg-slate-600"
-            )} />
-            <span className={cn("text-sm font-bold", isSubscribed ? "text-blue-400" : "text-slate-500")}>
-              {isSubscribed ? "Gemini Active" : "Unsubscribed"}
-            </span>
+            <div className="w-2 h-2 rounded-full bg-blue-500 shadow-lg shadow-blue-500/80 animate-pulse" />
+            <span className="text-sm font-bold text-blue-400">Gemini Active</span>
           </div>
         </div>
 
