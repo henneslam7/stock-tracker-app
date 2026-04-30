@@ -11,7 +11,7 @@ import { INITIAL_WATCHLIST } from "./constants";
 import {
   auth, loginWithGoogle, logout,
   loadPortfolioFromDb, syncPortfolioToDb, deletePortfolioItemDb,
-  checkSubscriptionDb, toggleSubscriptionDb,
+  checkSubscriptionDb,
 } from "./lib/firebase";
 
 import { Sidebar } from "./components/Sidebar";
@@ -30,6 +30,9 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  const isOwner = !!user && user.email === import.meta.env.VITE_OWNER_EMAIL;
+  const canUseAI = isSubscribed || isOwner;
   const [authModal, setAuthModal] = useState<{ isOpen: boolean; feature: string }>({ isOpen: false, feature: "" });
 
   // Data
@@ -98,6 +101,22 @@ export default function App() {
     return () => clearInterval(id);
   }, [portfolio, watchlist]);
 
+  // Handle Stripe redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('subscription') !== 'success') return;
+    window.history.replaceState({}, '', window.location.pathname);
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      if (++attempts > 5) return clearInterval(poll);
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const active = await checkSubscriptionDb(currentUser.uid);
+      if (active) { setIsSubscribed(true); clearInterval(poll); }
+    }, 2000);
+    return () => clearInterval(poll);
+  }, []);
+
   // Reset analysis when stock changes
   useEffect(() => { setAiAnalysis(null); }, [selectedStock?.symbol]);
 
@@ -118,19 +137,29 @@ export default function App() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
+  const startCheckout = async () => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Checkout unavailable');
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (e: any) {
+      showToast('Failed to start checkout. Try again.', 'error');
+    }
+  };
+
   const handleAnalyze = async () => {
     if (!selectedStock) return;
     if (!user) { setAuthModal({ isOpen: true, feature: "AI Analysis" }); return; }
-    if (!isSubscribed) {
+    if (!canUseAI) {
       setConfirmModal({
         message: "AI Analysis requires a subscription. Subscribe now?",
-        onConfirm: async () => {
-          try {
-            await toggleSubscriptionDb(user.uid, true);
-            setIsSubscribed(true);
-            showToast("Subscription active!");
-          } catch (e: any) { showToast(`Error: ${e.message}`, "error"); }
-        },
+        onConfirm: startCheckout,
       });
       return;
     }
@@ -166,16 +195,10 @@ export default function App() {
 
   const loadRecommendations = async () => {
     if (!user) { setAuthModal({ isOpen: true, feature: "AI Recommendations" }); return; }
-    if (!isSubscribed) {
+    if (!canUseAI) {
       setConfirmModal({
         message: "AI Recommendations require a subscription. Subscribe now?",
-        onConfirm: async () => {
-          try {
-            await toggleSubscriptionDb(user.uid, true);
-            setIsSubscribed(true);
-            showToast("Subscription active!");
-          } catch (e: any) { showToast(`Error: ${e.message}`, "error"); }
-        },
+        onConfirm: startCheckout,
       });
       return;
     }
@@ -294,18 +317,29 @@ export default function App() {
 
   const handleSubscriptionToggle = async () => {
     if (!user) { setAuthModal({ isOpen: true, feature: "Subscription Settings" }); return; }
-    setConfirmModal({
-      message: isSubscribed
-        ? "You are subscribed. Unsubscribe from AI features?"
-        : "Subscribe to AI features?",
-      onConfirm: async () => {
-        try {
-          await toggleSubscriptionDb(user.uid, !isSubscribed);
-          setIsSubscribed(s => !s);
-          showToast(isSubscribed ? "Unsubscribed" : "Subscription active!");
-        } catch (e: any) { showToast(`Error: ${e.message}`, "error"); }
-      },
-    });
+    if (isOwner) { showToast("Owner account — AI access is free."); return; }
+    if (isSubscribed) {
+      setConfirmModal({
+        message: "Manage or cancel your subscription?",
+        onConfirm: async () => {
+          try {
+            const token = await user.getIdToken();
+            const res = await fetch('/api/stripe/portal', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error('Portal unavailable');
+            const { url } = await res.json();
+            window.location.href = url;
+          } catch (e: any) { showToast(`Error: ${e.message}`, 'error'); }
+        },
+      });
+    } else {
+      setConfirmModal({
+        message: "Subscribe to AI Engine?",
+        onConfirm: startCheckout,
+      });
+    }
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -344,7 +378,7 @@ export default function App() {
       <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-2 min-w-0">
         <Header
           marketStatus={marketStatus}
-          isSubscribed={isSubscribed}
+          isSubscribed={canUseAI}
           user={user}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
