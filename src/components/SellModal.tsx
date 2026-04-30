@@ -11,12 +11,11 @@ interface SellModalProps {
   currentPrice: number;
   aiAnalysis: AIAnalysis | null;
   onClose: () => void;
-  onSell: (shares: number) => Promise<void>;
+  onSell: (shares: number) => void;
 }
 
 export function SellModal({ symbol, portfolioItem, currentPrice, aiAnalysis, onClose, onSell }: SellModalProps) {
   const [sharesToSell, setSharesToSell] = useState(portfolioItem.shares);
-  const [isSelling, setIsSelling] = useState(false);
 
   const profitTarget = aiAnalysis?.sellingPrice ?? portfolioItem.averagePrice * 1.10;
   const cutLoss     = aiAnalysis?.cutLossPrice  ?? portfolioItem.averagePrice * 0.92;
@@ -34,14 +33,9 @@ export function SellModal({ symbol, portfolioItem, currentPrice, aiAnalysis, onC
   const priceAboveCutLoss  = currentPrice > cutLoss;
   const priceAboveProfit   = currentPrice >= profitTarget;
 
-  const handleSell = async () => {
+  const handleSell = () => {
     if (sharesToSell <= 0 || sharesToSell > portfolioItem.shares) return;
-    setIsSelling(true);
-    try {
-      await onSell(sharesToSell);
-    } finally {
-      setIsSelling(false);
-    }
+    onSell(sharesToSell);
   };
 
   return (
@@ -165,17 +159,17 @@ export function SellModal({ symbol, portfolioItem, currentPrice, aiAnalysis, onC
         {/* Confirm button */}
         <button
           onClick={handleSell}
-          disabled={isSelling || sharesToSell <= 0}
+          disabled={false || sharesToSell <= 0}
           className={cn(
             "w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
             pnl >= 0
               ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
               : "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-500/20",
-            (isSelling || sharesToSell <= 0) ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"
+            (false || sharesToSell <= 0) ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"
           )}
         >
           <DollarSign size={16} />
-          {isSelling ? "Processing..." : `Confirm Sell ${sharesToSell} Share${sharesToSell !== 1 ? 's' : ''}`}
+          {false ? "Processing..." : `Confirm Sell ${sharesToSell} Share${sharesToSell !== 1 ? 's' : ''}`}
         </button>
       </div>
     </Modal>

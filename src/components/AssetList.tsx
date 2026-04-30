@@ -10,8 +10,8 @@ interface AssetListProps {
   prices: Record<string, Stock>;
   recommendations: Recommendation[];
   onSelectStock: (stock: Stock) => void;
-  onRemoveFromPortfolio: (symbol: string) => Promise<void>;
-  onAddToPortfolio: (symbol: string) => Promise<void>;
+  onRemoveFromPortfolio: (symbol: string) => void;
+  onAddToPortfolio: (symbol: string) => void;
   onToggleWatchlist: (symbol: string) => void;
   onSell: (symbol: string) => void;
 }

@@ -2,14 +2,13 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import YahooFinance from 'yahoo-finance2';
+import yahooFinance from 'yahoo-finance2';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 
 console.log("Starting server process...");
 dotenv.config();
 
-const yahooFinance = new YahooFinance({ queue: { concurrency: 4 } });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PERIOD_CONFIG: Record<string, { months: number; interval: '1d' | '1wk' }> = {

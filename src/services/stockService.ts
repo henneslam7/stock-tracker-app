@@ -4,7 +4,8 @@ export class StockService {
   static async searchSymbols(query: string) {
     if (!query) return [];
     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-    return await res.json();
+    if (!res.ok) return [];
+    return res.json();
   }
 
   static async getStocksData(symbols: string[]): Promise<Record<string, Stock>> {
@@ -12,10 +13,7 @@ export class StockService {
     const url = `/api/quote?symbols=${symbols.map(s => encodeURIComponent(s)).join(',')}`;
     try {
       const res = await fetch(url);
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Failed to fetch quotes: ${res.status} ${errorText}`);
-      }
+      if (!res.ok) return {};
       const quotes = await res.json();
 
       const data: Record<string, Stock> = {};
@@ -46,6 +44,7 @@ export class StockService {
 
   static async getStockInfo(symbol: string, period: string = '1m') {
     const res = await fetch(`/api/info?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}`);
-    return await res.json();
+    if (!res.ok) throw new Error(`Failed to fetch info: ${res.status}`);
+    return res.json();
   }
 }
