@@ -130,6 +130,11 @@ export function StockDrawer({
                     <RefreshCw size={20} className="animate-spin text-slate-500" />
                   </div>
                 )}
+                {!chartLoading && historicalData.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-600 text-xs font-bold uppercase tracking-widest">
+                    No chart data available
+                  </div>
+                )}
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={historicalData}>
                     <defs>

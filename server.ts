@@ -266,20 +266,41 @@ async function startServer() {
 
       let chart: any[] = [];
       try {
-        const candles = await fhFetch(
-          `/stock/candle?symbol=${symbol}&resolution=${config.resolution}&from=${fromTs}&to=${toTs}`
-        );
-        if ((candles as any).s === 'ok' && (candles as any).t) {
-          chart = (candles as any).t.map((ts: number, i: number) => ({
-            date: new Date(ts * 1000),
-            close: (candles as any).c[i],
-            open:  (candles as any).o?.[i],
-            high:  (candles as any).h?.[i],
-            low:   (candles as any).l?.[i],
-            volume:(candles as any).v?.[i],
-          }));
-        }
-      } catch (err) { console.error('Chart error:', err); }
+        // Primary: Yahoo Finance v8 chart (works without crumb for OHLCV)
+        const { range, interval } = HK_PERIOD_MAP[period] ?? HK_PERIOD_MAP['1m'];
+        const yhData = await yhFetch(symbol, range, interval);
+        const yhResult = yhData.chart?.result?.[0];
+        const timestamps: number[] = yhResult?.timestamp || [];
+        const yhQuotes = yhResult?.indicators?.quote?.[0] || {};
+        chart = timestamps
+          .map((ts: number, i: number) => ({
+            date:   new Date(ts * 1000),
+            close:  yhQuotes.close?.[i],
+            open:   yhQuotes.open?.[i],
+            high:   yhQuotes.high?.[i],
+            low:    yhQuotes.low?.[i],
+            volume: yhQuotes.volume?.[i],
+          }))
+          .filter((c: any) => c.close != null);
+      } catch (err) {
+        console.error('Chart error (Yahoo):', err);
+        // Fallback: Finnhub candles
+        try {
+          const candles = await fhFetch(
+            `/stock/candle?symbol=${symbol}&resolution=${config.resolution}&from=${fromTs}&to=${toTs}`
+          );
+          if ((candles as any).s === 'ok' && (candles as any).t) {
+            chart = (candles as any).t.map((ts: number, i: number) => ({
+              date:   new Date(ts * 1000),
+              close:  (candles as any).c[i],
+              open:   (candles as any).o?.[i],
+              high:   (candles as any).h?.[i],
+              low:    (candles as any).l?.[i],
+              volume: (candles as any).v?.[i],
+            }));
+          }
+        } catch (err2) { console.error('Chart fallback error:', err2); }
+      }
 
       let news: any[] = [];
       try {
@@ -358,28 +379,30 @@ Output JSON (no markdown):
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-1.5-flash',
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
 
-      const parsed = JSON.parse(response.text || '{}');
+      let parsed: any = {};
+      try { parsed = JSON.parse(response.text || '{}'); } catch { parsed = {}; }
       res.json({
         ...parsed,
         cutLossPrice: parsed.cutLossPrice ?? stock.price * 0.92,
       });
     } catch (e: any) {
       console.error('Analyze error:', e.message);
-      res.status(500).json({
+      // Return 200 with fallback so the client renders something instead of toast error
+      res.json({
         sentiment: 'Mild',
         priceTarget: req.body.stock?.price * 1.05 || 0,
         buyInPrice:  req.body.stock?.price * 0.95 || 0,
         sellingPrice: req.body.stock?.price * 1.10 || 0,
         cutLossPrice: req.body.stock?.price * 0.92 || 0,
         confidence: 0.5,
-        summary: 'Analysis unavailable.',
-        risks: ['Market volatility'],
-        opportunities: ['Long term growth'],
+        summary: `分析暫時不可用 (${String(e.message).slice(0, 60)})`,
+        risks: ['市場波動性較大'],
+        opportunities: ['長線增長潛力'],
       });
     }
   });
@@ -405,12 +428,14 @@ Output pure JSON array, no markdown. 'reason' must be in Cantonese.
 }]`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-1.5-flash',
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
 
-      res.json(JSON.parse(response.text || '[]'));
+      let recs: any[] = [];
+      try { recs = JSON.parse(response.text || '[]'); } catch { recs = []; }
+      res.json(recs);
     } catch (e: any) {
       console.error('Recommendations error:', e.message);
       res.json([]);
