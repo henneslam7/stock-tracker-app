@@ -2,7 +2,6 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import yahooFinance from 'yahoo-finance2';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 
@@ -11,12 +10,53 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const PERIOD_CONFIG: Record<string, { months: number; interval: '1d' | '1wk' }> = {
-  '1m': { months: 1,  interval: '1d' },
-  '3m': { months: 3,  interval: '1d' },
-  '6m': { months: 6,  interval: '1d' },
-  '1y': { months: 12, interval: '1wk' },
+// ── Finnhub ──────────────────────────────────────────────────────────────────
+
+const FINNHUB = 'https://finnhub.io/api/v1';
+
+function fhKey() {
+  const k = process.env.FINNHUB_API_KEY;
+  if (!k) throw new Error('FINNHUB_API_KEY not set');
+  return k;
+}
+
+async function fhFetch(path: string): Promise<any> {
+  const sep = path.includes('?') ? '&' : '?';
+  const res = await fetch(`${FINNHUB}${path}${sep}token=${fhKey()}`);
+  if (!res.ok) throw new Error(`Finnhub ${res.status}: ${path}`);
+  return res.json();
+}
+
+// 1-hour in-memory cache for slow-changing data (profile, metrics)
+const cache: Record<string, { data: any; ts: number }> = {};
+const CACHE_TTL = 60 * 60 * 1000;
+
+async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const hit = cache[key];
+  if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data;
+  const data = await fn();
+  cache[key] = { data, ts: Date.now() };
+  return data;
+}
+
+const getProfile = (symbol: string) =>
+  cached(`profile:${symbol}`, () => fhFetch(`/stock/profile2?symbol=${symbol}`));
+
+const getMetrics = (symbol: string) =>
+  cached(`metrics:${symbol}`, () =>
+    fhFetch(`/stock/metric?symbol=${symbol}&metric=all`).then((r: any) => r.metric || {})
+  );
+
+// ── Period config ─────────────────────────────────────────────────────────────
+
+const PERIOD_CONFIG: Record<string, { months: number; resolution: string }> = {
+  '1m': { months: 1,  resolution: 'D' },
+  '3m': { months: 3,  resolution: 'D' },
+  '6m': { months: 6,  resolution: 'D' },
+  '1y': { months: 12, resolution: 'W' },
 };
+
+// ── Gemini ────────────────────────────────────────────────────────────────────
 
 function getGeminiClient() {
   const key = process.env.GEMINI_API_KEY;
@@ -31,15 +71,24 @@ async function startServer() {
 
   app.use(express.json({ limit: '2mb' }));
 
-  // ── Stock APIs ───────────────────────────────────────────────────────────
+  // ── Stock APIs ───────────────────────────────────────────────────────────────
 
   app.get('/api/search', async (req: any, res: any) => {
+    const query = req.query.q as string;
+    if (!query) return res.json([]);
     try {
-      const query = req.query.q as string;
-      if (!query) return res.json([]);
-      const result = await yahooFinance.search(query, { quotesCount: 6, newsCount: 0 }, { validateResult: false });
-      // @ts-ignore
-      res.json(result.quotes.filter((q: any) => ['EQUITY','ETF','INDEX'].includes(q.quoteType)));
+      const data = await fhFetch(`/search?q=${encodeURIComponent(query)}`);
+      const results = (data.result || [])
+        .filter((r: any) => ['Common Stock', 'ETP', 'ADR'].includes(r.type))
+        .slice(0, 6)
+        .map((r: any) => ({
+          symbol: r.symbol,
+          shortName: r.description,
+          longName: r.description,
+          exchDisp: r.primaryExchange || '',
+          quoteType: r.type === 'ETP' ? 'ETF' : 'EQUITY',
+        }));
+      res.json(results);
     } catch (e: any) {
       console.error('Search error:', e.message);
       res.json([]);
@@ -47,11 +96,40 @@ async function startServer() {
   });
 
   app.get('/api/quote', async (req: any, res: any) => {
+    const symbols = ((req.query.symbols as string) || '').split(',').filter(Boolean);
+    if (!symbols.length) return res.json([]);
     try {
-      const symbols = ((req.query.symbols as string) || '').split(',').filter(Boolean);
-      if (symbols.length === 0) return res.json([]);
-      const result = await yahooFinance.quote(symbols, {}, { validateResult: false });
-      res.json(Array.isArray(result) ? result : [result]);
+      const results = await Promise.all(
+        symbols.map(async (symbol) => {
+          const [quote, profile, metrics] = await Promise.all([
+            fhFetch(`/quote?symbol=${symbol}`),
+            getProfile(symbol).catch(() => ({})),
+            getMetrics(symbol).catch(() => ({})),
+          ]);
+          // Return Yahoo Finance-compatible field names so stockService.ts needs no changes
+          return {
+            symbol,
+            longName: (profile as any).name || symbol,
+            shortName: (profile as any).name || symbol,
+            regularMarketPrice: (quote as any).c || 0,
+            regularMarketChange: (quote as any).d || 0,
+            regularMarketChangePercent: (quote as any).dp || 0,
+            marketCap: (profile as any).marketCapitalization
+              ? (profile as any).marketCapitalization * 1e6
+              : null,
+            regularMarketVolume: null,
+            quoteType: 'EQUITY',
+            trailingPE: (metrics as any).peNormalizedAnnual || null,
+            fiftyTwoWeekHigh: (metrics as any)['52WeekHigh'] || null,
+            fiftyTwoWeekLow: (metrics as any)['52WeekLow'] || null,
+            trailingAnnualDividendYield: (metrics as any).dividendYieldIndicatedAnnual
+              ? (metrics as any).dividendYieldIndicatedAnnual / 100
+              : null,
+            beta: (metrics as any).beta || null,
+          };
+        })
+      );
+      res.json(results);
     } catch (e: any) {
       console.error('Quote error:', e.message);
       res.json([]);
@@ -59,38 +137,85 @@ async function startServer() {
   });
 
   app.get('/api/info', async (req: any, res: any) => {
-    try {
-      const symbol = req.query.symbol as string;
-      const period = (req.query.period as string) || '1m';
-      const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG['1m'];
+    const symbol = req.query.symbol as string;
+    const period = (req.query.period as string) || '1m';
+    const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG['1m'];
 
-      const quote = await yahooFinance.quote(symbol, {}, { validateResult: false });
-      const now = new Date();
-      const period1 = new Date(now.getFullYear(), now.getMonth() - config.months, now.getDate());
+    const toTs   = Math.floor(Date.now() / 1000);
+    const fromTs = toTs - config.months * 30 * 24 * 3600;
+
+    try {
+      const [quote, profile] = await Promise.all([
+        fhFetch(`/quote?symbol=${symbol}`),
+        getProfile(symbol).catch(() => ({})),
+      ]);
+
+      // Normalised quote object for AI prompt
+      const quoteNorm = {
+        symbol,
+        regularMarketPrice: (quote as any).c || 0,
+        regularMarketChange: (quote as any).d || 0,
+        regularMarketChangePercent: (quote as any).dp || 0,
+        longName: (profile as any).name || symbol,
+      };
 
       let chart: any[] = [];
-      try { chart = await yahooFinance.historical(symbol, { period1, period2: now, interval: config.interval }, { validateResult: false }); }
-      catch (err) { console.error("Chart fetch error for", symbol, err); }
+      try {
+        const candles = await fhFetch(
+          `/stock/candle?symbol=${symbol}&resolution=${config.resolution}&from=${fromTs}&to=${toTs}`
+        );
+        if ((candles as any).s === 'ok' && (candles as any).t) {
+          chart = (candles as any).t.map((ts: number, i: number) => ({
+            date: new Date(ts * 1000),
+            close: (candles as any).c[i],
+            open:  (candles as any).o?.[i],
+            high:  (candles as any).h?.[i],
+            low:   (candles as any).l?.[i],
+            volume:(candles as any).v?.[i],
+          }));
+        }
+      } catch (err) { console.error('Chart error:', err); }
 
       let news: any[] = [];
       try {
-        const searchData = await yahooFinance.search(symbol, { newsCount: 5, quotesCount: 0 }, { validateResult: false });
-        // @ts-ignore
-        news = searchData.news || [];
-      } catch (err) { console.error("News fetch error:", err); }
+        const fromDate = new Date(fromTs * 1000).toISOString().split('T')[0];
+        const toDate   = new Date().toISOString().split('T')[0];
+        const rawNews  = await fhFetch(
+          `/company-news?symbol=${symbol}&from=${fromDate}&to=${toDate}`
+        );
+        news = ((rawNews as any[]) || []).slice(0, 5).map((n: any) => ({
+          title: n.headline,
+          url: n.url,
+        }));
+      } catch (err) { console.error('News error:', err); }
 
-      let quoteSummary = null;
-      try { quoteSummary = await yahooFinance.quoteSummary(symbol, { modules: ['financialData','defaultKeyStatistics','summaryDetail'] }, { validateResult: false }); }
-      catch (err) { console.error("QuoteSummary fetch error:", err); }
+      let quoteSummary: any = null;
+      try {
+        const metrics = await getMetrics(symbol);
+        quoteSummary = {
+          financialData: {},
+          defaultKeyStatistics: {
+            beta: (metrics as any).beta,
+            trailingPE: (metrics as any).peNormalizedAnnual,
+            forwardPE:  (metrics as any).peTTM,
+          },
+          summaryDetail: {
+            dividendYield: (metrics as any).dividendYieldIndicatedAnnual,
+            marketCap: (profile as any).marketCapitalization
+              ? (profile as any).marketCapitalization * 1e6
+              : null,
+          },
+        };
+      } catch (err) { console.error('Metrics error:', err); }
 
-      res.json({ quote, chart, news, quoteSummary });
+      res.json({ quote: quoteNorm, chart, news, quoteSummary });
     } catch (e: any) {
       console.error('Info error:', e.message);
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ── Gemini AI APIs ────────────────────────────────────────────────────────
+  // ── Gemini AI APIs ────────────────────────────────────────────────────────────
 
   app.post('/api/analyze', async (req: any, res: any) => {
     try {
@@ -187,7 +312,7 @@ Output pure JSON array, no markdown. 'reason' must be in Cantonese.
     }
   });
 
-  // ── Static / SPA ──────────────────────────────────────────────────────────
+  // ── Static / SPA ─────────────────────────────────────────────────────────────
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
