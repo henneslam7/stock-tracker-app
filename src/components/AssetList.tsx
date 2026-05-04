@@ -10,8 +10,8 @@ interface AssetListProps {
   prices: Record<string, Stock>;
   recommendations: Recommendation[];
   onSelectStock: (stock: Stock) => void;
-  onRemoveFromPortfolio: (symbol: string) => Promise<void>;
-  onAddToPortfolio: (symbol: string) => Promise<void>;
+  onRemoveFromPortfolio: (symbol: string) => void;
+  onAddToPortfolio: (symbol: string) => void;
   onToggleWatchlist: (symbol: string) => void;
   onSell: (symbol: string) => void;
 }
@@ -156,12 +156,22 @@ export function AssetList({
                       </button>
                     </>
                   ) : (
-                    <button
-                      onClick={async e => { e.stopPropagation(); await onAddToPortfolio(item.symbol); }}
-                      className="p-2 text-accent hover:bg-accent/10 rounded-xl"
-                    >
-                      <Plus size={16} />
-                    </button>
+                    <>
+                      <button
+                        onClick={e => { e.stopPropagation(); onAddToPortfolio(item.symbol); }}
+                        className="p-2 text-accent hover:bg-accent/10 rounded-xl"
+                        title="Add to portfolio"
+                      >
+                        <Plus size={16} />
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); onToggleWatchlist(item.symbol); }}
+                        className="p-2 text-rose-400 hover:bg-rose-400/10 rounded-xl"
+                        title="Remove from watchlist"
+                      >
+                        <X size={16} />
+                      </button>
+                    </>
                   )}
                   <div className="p-2 text-slate-500"><ChevronRight size={16} /></div>
                 </div>

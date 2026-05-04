@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
 
 import { Stock, PortfolioItem, AIAnalysis, Recommendation, ActiveTab } from "./types";
 import { StockService } from "./services/stockService";
@@ -8,11 +7,6 @@ import { calculateRSI, calculateMACD } from "./lib/indicators";
 import { getMarketStatus } from "./lib/marketUtils";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { INITIAL_WATCHLIST } from "./constants";
-import {
-  auth, loginWithGoogle, logout,
-  loadPortfolioFromDb, syncPortfolioToDb, deletePortfolioItemDb,
-  checkSubscriptionDb, toggleSubscriptionDb,
-} from "./lib/firebase";
 
 import { Sidebar } from "./components/Sidebar";
 import { Header } from "./components/Header";
@@ -20,18 +14,11 @@ import { PortfolioSummaryCard } from "./components/PortfolioSummaryCard";
 import { AssetList } from "./components/AssetList";
 import { StockIntelCard } from "./components/StockIntelCard";
 import { StockDrawer } from "./components/StockDrawer";
-import { AuthModal } from "./components/AuthModal";
 import { SellModal } from "./components/SellModal";
 import { Toast } from "./components/ui/Toast";
 import { ConfirmModal } from "./components/ui/Modal";
 
 export default function App() {
-  // Auth
-  const [user, setUser] = useState<User | null>(null);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [authModal, setAuthModal] = useState<{ isOpen: boolean; feature: string }>({ isOpen: false, feature: "" });
-
   // Data
   const [portfolio, setPortfolio] = useLocalStorage<PortfolioItem[]>("stock_tracker_portfolio", []);
   const [watchlist, setWatchlist] = useLocalStorage<string[]>("stock_tracker_watchlist", INITIAL_WATCHLIST);
@@ -60,21 +47,6 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Auth listener
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async currentUser => {
-      setUser(currentUser);
-      if (currentUser) {
-        const dbPortfolio = await loadPortfolioFromDb(currentUser.uid);
-        if (dbPortfolio.length > 0) setPortfolio(dbPortfolio);
-        const subStatus = await checkSubscriptionDb(currentUser.uid);
-        setIsSubscribed(subStatus);
-      }
-      setIsAuthLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
   // Market clock
   useEffect(() => {
     const tick = () => setMarketStatus(getMarketStatus());
@@ -90,7 +62,7 @@ export default function App() {
       if (symbols.length === 0) return;
       try {
         const data = await StockService.getStocksData(symbols);
-        setPrices(data);
+        if (Object.keys(data).length > 0) setPrices(data);
       } catch { /* swallow */ }
     };
     fetch();
@@ -120,21 +92,6 @@ export default function App() {
 
   const handleAnalyze = async () => {
     if (!selectedStock) return;
-    if (!user) { setAuthModal({ isOpen: true, feature: "AI Analysis" }); return; }
-    if (!isSubscribed) {
-      setConfirmModal({
-        message: "AI Analysis requires a subscription. Subscribe now?",
-        onConfirm: async () => {
-          try {
-            await toggleSubscriptionDb(user.uid, true);
-            setIsSubscribed(true);
-            showToast("Subscription active!");
-          } catch (e: any) { showToast(`Error: ${e.message}`, "error"); }
-        },
-      });
-      return;
-    }
-
     setIsAnalyzing(true);
     try {
       const info = await StockService.getStockInfo(selectedStock.symbol);
@@ -165,20 +122,6 @@ export default function App() {
   };
 
   const loadRecommendations = async () => {
-    if (!user) { setAuthModal({ isOpen: true, feature: "AI Recommendations" }); return; }
-    if (!isSubscribed) {
-      setConfirmModal({
-        message: "AI Recommendations require a subscription. Subscribe now?",
-        onConfirm: async () => {
-          try {
-            await toggleSubscriptionDb(user.uid, true);
-            setIsSubscribed(true);
-            showToast("Subscription active!");
-          } catch (e: any) { showToast(`Error: ${e.message}`, "error"); }
-        },
-      });
-      return;
-    }
     setActiveTab("discover");
     if (recommendations.length === 0) {
       const recs = await getRecommendations();
@@ -186,10 +129,8 @@ export default function App() {
     }
   };
 
-  const addToPortfolioManual = async (symbol: string, shares: number, buyPrice: number) => {
+  const addToPortfolioManual = (symbol: string, shares: number, buyPrice: number) => {
     if (shares <= 0) return;
-    if (!user) { setAuthModal({ isOpen: true, feature: "Portfolio Sync" }); return; }
-
     const cost = buyPrice * shares;
     const existing = portfolio.find(p => p.symbol === symbol);
     const updated: PortfolioItem[] = existing
@@ -200,78 +141,41 @@ export default function App() {
           return { ...p, shares: newShares, totalCost: newTotalCost, averagePrice: newTotalCost / newShares };
         })
       : [...portfolio, { symbol, shares, averagePrice: buyPrice, totalCost: cost }];
-
-    const prev = [...portfolio];
-    try {
-      setPortfolio(updated);
-      await syncPortfolioToDb(user.uid, updated);
-      showToast(`Added ${shares} ${symbol} @ $${buyPrice.toFixed(2)}`);
-    } catch (e: any) {
-      setPortfolio(prev);
-      showToast(`Error: ${e.message}`, "error");
-    }
+    setPortfolio(updated);
+    showToast(`Added ${shares} ${symbol} @ $${buyPrice.toFixed(2)}`);
   };
 
-  const sellPortfolioItem = async (symbol: string, sharesToSell: number) => {
-    if (!user) return;
+  const sellPortfolioItem = (symbol: string, sharesToSell: number) => {
     const item = portfolio.find(p => p.symbol === symbol);
     if (!item) return;
-
     const currentPrice = prices[symbol]?.price ?? item.averagePrice;
-    const prev = [...portfolio];
-
-    try {
-      let updated: PortfolioItem[];
-      if (sharesToSell >= item.shares) {
-        updated = portfolio.filter(p => p.symbol !== symbol);
-        await deletePortfolioItemDb(user.uid, symbol);
-      } else {
-        const newShares = item.shares - sharesToSell;
-        updated = portfolio.map(p =>
-          p.symbol === symbol
-            ? { ...p, shares: newShares, totalCost: p.averagePrice * newShares }
-            : p
-        );
-        await syncPortfolioToDb(user.uid, updated);
-      }
-      setPortfolio(updated);
-
-      const pnl = (currentPrice - item.averagePrice) * sharesToSell;
-      showToast(
-        `Sold ${sharesToSell} ${symbol} • P&L: ${pnl >= 0 ? "+" : ""}$${Math.abs(pnl).toFixed(2)}`,
-        pnl >= 0 ? "success" : "error"
+    let updated: PortfolioItem[];
+    if (sharesToSell >= item.shares) {
+      updated = portfolio.filter(p => p.symbol !== symbol);
+    } else {
+      const newShares = item.shares - sharesToSell;
+      updated = portfolio.map(p =>
+        p.symbol === symbol
+          ? { ...p, shares: newShares, totalCost: p.averagePrice * newShares }
+          : p
       );
-    } catch (e: any) {
-      setPortfolio(prev);
-      showToast(`Error: ${e.message}`, "error");
     }
+    setPortfolio(updated);
+    const pnl = (currentPrice - item.averagePrice) * sharesToSell;
+    showToast(
+      `Sold ${sharesToSell} ${symbol} • P&L: ${pnl >= 0 ? "+" : ""}$${Math.abs(pnl).toFixed(2)}`,
+      pnl >= 0 ? "success" : "error"
+    );
   };
 
-  const removeFromPortfolio = async (symbol: string) => {
-    if (!user) return;
-    const prev = [...portfolio];
-    try {
-      setPortfolio(prev.filter(p => p.symbol !== symbol));
-      await deletePortfolioItemDb(user.uid, symbol);
-    } catch (e: any) {
-      setPortfolio(prev);
-      showToast(`Error: ${e.message}`, "error");
-    }
+  const removeFromPortfolio = (symbol: string) => {
+    setPortfolio(portfolio.filter(p => p.symbol !== symbol));
   };
 
-  const addToPortfolio = async (symbol: string) => {
-    if (!user) { setAuthModal({ isOpen: true, feature: "Portfolio Sync" }); return; }
+  const addToPortfolio = (symbol: string) => {
     if (portfolio.find(p => p.symbol === symbol)) return;
-    const prev = [...portfolio];
     const price = prices[symbol]?.price ?? 0;
-    const updated = [...portfolio, { symbol, shares: 1, averagePrice: price, totalCost: price }];
-    try {
-      setPortfolio(updated);
-      await syncPortfolioToDb(user.uid, updated);
-    } catch (e: any) {
-      setPortfolio(prev);
-      showToast(`Error: ${e.message}`, "error");
-    }
+    setPortfolio([...portfolio, { symbol, shares: 1, averagePrice: price, totalCost: price }]);
   };
 
   const toggleWatchlist = (symbol: string) => {
@@ -281,31 +185,22 @@ export default function App() {
     );
   };
 
-  const handleLogout = () => {
-    setConfirmModal({
-      message: "Logout?",
-      onConfirm: async () => {
-        await logout();
-        setPortfolio([]);
-        showToast("Logged out");
-      },
-    });
-  };
-
-  const handleSubscriptionToggle = async () => {
-    if (!user) { setAuthModal({ isOpen: true, feature: "Subscription Settings" }); return; }
-    setConfirmModal({
-      message: isSubscribed
-        ? "You are subscribed. Unsubscribe from AI features?"
-        : "Subscribe to AI features?",
-      onConfirm: async () => {
-        try {
-          await toggleSubscriptionDb(user.uid, !isSubscribed);
-          setIsSubscribed(s => !s);
-          showToast(isSubscribed ? "Unsubscribed" : "Subscription active!");
-        } catch (e: any) { showToast(`Error: ${e.message}`, "error"); }
-      },
-    });
+  const handleSelectFromSearch = async (symbol: string, name: string) => {
+    setSearchQuery("");
+    setFilteredSearch([]);
+    if (prices[symbol]) {
+      setSelectedStock(prices[symbol]);
+      return;
+    }
+    try {
+      const data = await StockService.getStocksData([symbol]);
+      if (data[symbol]) {
+        setPrices(prev => ({ ...prev, ...data }));
+        setSelectedStock(data[symbol]);
+      }
+    } catch {
+      showToast(`Failed to load ${symbol}`, "error");
+    }
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -326,8 +221,6 @@ export default function App() {
 
   const sellItem = sellSymbol ? portfolio.find(p => p.symbol === sellSymbol) : undefined;
 
-  if (isAuthLoading) return null;
-
   return (
     <div className="flex h-screen bg-bg text-ink font-sans overflow-hidden p-6 gap-6">
       <Sidebar
@@ -336,23 +229,18 @@ export default function App() {
         onLoadRecommendations={loadRecommendations}
         onSearchFocus={() => searchInputRef.current?.focus()}
         onRefresh={() => window.location.reload()}
-        user={user}
-        onUserClick={() => setAuthModal({ isOpen: true, feature: "User Profile" })}
-        onLogout={handleLogout}
       />
 
       <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-2 min-w-0">
         <Header
           marketStatus={marketStatus}
-          isSubscribed={isSubscribed}
-          user={user}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           searchResults={filteredSearch}
           prices={prices}
           watchlist={watchlist}
-          onToggleWatchlist={symbol => { toggleWatchlist(symbol); setSearchQuery(""); }}
-          onSubscriptionClick={handleSubscriptionToggle}
+          onToggleWatchlist={toggleWatchlist}
+          onSelectFromSearch={handleSelectFromSearch}
           searchInputRef={searchInputRef}
         />
 
@@ -392,7 +280,6 @@ export default function App() {
         <StockDrawer
           stock={selectedStock}
           portfolioItem={portfolio.find(p => p.symbol === selectedStock.symbol)}
-          user={user}
           aiAnalysis={aiAnalysis}
           isAnalyzing={isAnalyzing}
           onClose={() => setSelectedStock(null)}
@@ -410,19 +297,12 @@ export default function App() {
           currentPrice={prices[sellSymbol]?.price ?? sellItem.averagePrice}
           aiAnalysis={selectedStock?.symbol === sellSymbol ? aiAnalysis : null}
           onClose={() => setSellSymbol(null)}
-          onSell={async shares => {
-            await sellPortfolioItem(sellSymbol, shares);
+          onSell={shares => {
+            sellPortfolioItem(sellSymbol, shares);
             setSellSymbol(null);
           }}
         />
       )}
-
-      <AuthModal
-        isOpen={authModal.isOpen}
-        feature={authModal.feature}
-        onClose={() => setAuthModal({ isOpen: false, feature: "" })}
-        onLogin={loginWithGoogle}
-      />
 
       <ConfirmModal
         isOpen={!!confirmModal}

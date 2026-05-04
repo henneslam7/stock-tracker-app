@@ -7,7 +7,6 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer
 } from "recharts";
-import { User } from "firebase/auth";
 import { cn } from "../lib/utils";
 import { Stock, PortfolioItem, AIAnalysis, PricePoint, ChartTimeframe } from "../types";
 import { StockService } from "../services/stockService";
@@ -22,18 +21,17 @@ const TIMEFRAMES: { label: string; value: ChartTimeframe }[] = [
 interface StockDrawerProps {
   stock: Stock;
   portfolioItem: PortfolioItem | undefined;
-  user: User | null;
   aiAnalysis: AIAnalysis | null;
   isAnalyzing: boolean;
   onClose: () => void;
   onAnalyze: () => void;
-  onAddToPortfolio: (symbol: string, shares: number, buyPrice: number) => Promise<void>;
+  onAddToPortfolio: (symbol: string, shares: number, buyPrice: number) => void;
   onSell: (symbol: string) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
 export function StockDrawer({
-  stock, portfolioItem, user, aiAnalysis, isAnalyzing,
+  stock, portfolioItem, aiAnalysis, isAnalyzing,
   onClose, onAnalyze, onAddToPortfolio, onSell, showToast
 }: StockDrawerProps) {
   const [historicalData, setHistoricalData] = useState<PricePoint[]>([]);
