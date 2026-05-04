@@ -309,9 +309,11 @@ async function startServer() {
         const rawNews  = await fhFetch(
           `/company-news?symbol=${symbol}&from=${fromDate}&to=${toDate}`
         );
-        news = ((rawNews as any[]) || []).slice(0, 5).map((n: any) => ({
+        news = ((rawNews as any[]) || []).slice(0, 10).map((n: any) => ({
           title: n.headline,
+          summary: (n.summary || '').slice(0, 250),
           url: n.url,
+          date: n.datetime ? new Date(n.datetime * 1000).toISOString().split('T')[0] : '',
         }));
       } catch (err) { console.error('News error:', err); }
 
@@ -348,34 +350,49 @@ async function startServer() {
       const { stock, historicalData, news, quoteSummary, userEntryPrice } = req.body;
       const ai = getGeminiClient();
 
-      const prompt = `
-You are a quantitative stock analyst AI. Output strictly as JSON with no markdown wrappers.
-Write 'summary', 'opportunities', 'risks' in Cantonese (Traditional Chinese).
+      const newsText = (news || []).slice(0, 8)
+        .map((n: any) => `• ${n.title}${n.summary ? ': ' + n.summary : ''}`)
+        .join('\n') || 'No recent news.';
 
-Stock: ${stock.symbol} (${stock.name})
+      const prompt = `
+You are a senior quantitative analyst. Output ONLY raw JSON — no markdown, no code fences.
+All text fields MUST be written in Traditional Chinese (Cantonese).
+
+═══ STOCK DATA ═══
+Symbol: ${stock.symbol} (${stock.name})
 Current Price: $${stock.price}
 User Entry Price: $${userEntryPrice}
-Key Stats: PE=${stock.peRatio}, 52W=${stock.low52w}-${stock.high52w}, Yield=${stock.dividendYield}, Beta=${stock.beta}
-Financials: ${JSON.stringify(quoteSummary)}
-Chart (last 15 candles): ${JSON.stringify(historicalData ? historicalData.slice(-15) : [])}
-Headlines: ${JSON.stringify(news ? news.map((n: any) => n.title) : [])}
+PE Ratio: ${stock.peRatio} | 52W Range: $${stock.low52w} – $${stock.high52w}
+Dividend Yield: ${stock.dividendYield} | Beta: ${stock.beta}
+Fundamentals: ${JSON.stringify(quoteSummary)}
 
-Guidelines:
-1. buyInPrice: based on CURRENT PRICE ($${stock.price}) and technical support levels.
-2. sellingPrice: profit target from user entry ($${userEntryPrice}) aligned to resistance.
-3. cutLossPrice: stop-loss BELOW current price, typically 5-15% down from current.
+═══ TECHNICAL CHART (last 20 candles, chronological) ═══
+${JSON.stringify(historicalData ? historicalData.slice(-20) : [])}
 
-Output JSON (no markdown):
+═══ RECENT NEWS (analyse sentiment & near-term impact) ═══
+${newsText}
+
+═══ INSTRUCTIONS ═══
+1. buyInPrice  — optimal entry based on chart support near CURRENT price $${stock.price}
+2. sellingPrice — profit target from user entry $${userEntryPrice}, aligned to chart resistance
+3. cutLossPrice — stop-loss 5–15% below current price $${stock.price}
+4. newsInsight  — 2–3 sentences (Cantonese) on how the news affects near-term outlook
+5. summary      — 2-sentence overall market outlook (Cantonese)
+6. opportunities — at least 3 specific growth catalysts (Cantonese)
+7. risks        — at least 3 specific risk factors (Cantonese)
+
+Output JSON (strict schema, no extra keys):
 {
   "sentiment": "High"|"Mild"|"Low",
   "priceTarget": number,
   "buyInPrice": number,
   "sellingPrice": number,
   "cutLossPrice": number,
-  "confidence": number (0-1),
-  "summary": string (2 sentences, Cantonese),
-  "opportunities": string[] (Cantonese),
-  "risks": string[] (Cantonese)
+  "confidence": number,
+  "summary": string,
+  "newsInsight": string,
+  "opportunities": string[],
+  "risks": string[]
 }`;
 
       const response = await ai.models.generateContent({
