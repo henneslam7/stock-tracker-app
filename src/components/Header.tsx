@@ -11,12 +11,13 @@ interface HeaderProps {
   prices: Record<string, Stock>;
   watchlist: string[];
   onToggleWatchlist: (symbol: string) => void;
+  onSelectFromSearch: (symbol: string, name: string) => void;
   searchInputRef: RefObject<HTMLInputElement>;
 }
 
 export function Header({
   marketStatus, searchQuery, onSearchChange,
-  searchResults, prices, watchlist, onToggleWatchlist, searchInputRef
+  searchResults, prices, watchlist, onToggleWatchlist, onSelectFromSearch, searchInputRef
 }: HeaderProps) {
   return (
     <div className="flex-none flex items-center justify-between px-2">
@@ -68,16 +69,17 @@ export function Header({
             <div className="absolute top-full left-0 right-0 mt-3 bg-surface border border-white/10 rounded-2xl shadow-2xl z-[60] max-h-60 overflow-y-auto backdrop-blur-xl">
               {searchResults.map(s => {
                 const { symbol } = s;
+                const name = s.shortName || s.longName || symbol;
                 return (
-                  <button
+                  <div
                     key={symbol}
-                    onClick={() => onToggleWatchlist(symbol)}
-                    className="w-full text-left px-5 py-4 hover:bg-white/5 flex items-center justify-between border-b last:border-0 border-white/5 transition-colors"
+                    onClick={() => onSelectFromSearch(symbol, name)}
+                    className="w-full text-left px-5 py-4 hover:bg-white/5 flex items-center justify-between border-b last:border-0 border-white/5 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center justify-between w-full mr-4">
                       <div>
                         <div className="font-bold text-sm text-white">{symbol}</div>
-                        <div className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]">{s.shortName || s.longName}</div>
+                        <div className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]">{name}</div>
                         <div className="text-[9px] text-slate-500 font-bold tracking-widest uppercase">{s.exchDisp || "STOCK"} • {s.quoteType || "EQUITY"}</div>
                       </div>
                       {prices[symbol] && (
@@ -89,8 +91,13 @@ export function Header({
                         </div>
                       )}
                     </div>
-                    {watchlist.includes(symbol) ? <X size={16} className="text-slate-500" /> : <Plus size={16} className="text-accent" />}
-                  </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); onToggleWatchlist(symbol); }}
+                      className="shrink-0 p-1 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      {watchlist.includes(symbol) ? <X size={16} className="text-slate-500" /> : <Plus size={16} className="text-accent" />}
+                    </button>
+                  </div>
                 );
               })}
             </div>

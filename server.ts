@@ -47,6 +47,47 @@ const getMetrics = (symbol: string) =>
     fhFetch(`/stock/metric?symbol=${symbol}&metric=all`).then((r: any) => r.metric || {})
   );
 
+// ── Yahoo Finance (HK stocks) ─────────────────────────────────────────────────
+
+const isHK = (sym: string) => sym.toUpperCase().endsWith('.HK');
+
+async function yhFetch(symbol: string, range: string, interval: string): Promise<any> {
+  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}&includePrePost=false`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) throw new Error(`Yahoo chart ${res.status}: ${symbol}`);
+  return res.json();
+}
+
+const HK_PERIOD_MAP: Record<string, { range: string; interval: string }> = {
+  '1m': { range: '1mo', interval: '1d' },
+  '3m': { range: '3mo', interval: '1d' },
+  '6m': { range: '6mo', interval: '1d' },
+  '1y': { range: '1y',  interval: '1wk' },
+};
+
+function normalizeYahooQuote(symbol: string, meta: any) {
+  const price     = meta.regularMarketPrice || 0;
+  const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? 0;
+  const change    = price - prevClose;
+  const changePct = prevClose ? (change / prevClose) * 100 : (meta.regularMarketChangePercent || 0);
+  return {
+    symbol,
+    longName: meta.shortName || meta.longName || symbol,
+    shortName: meta.shortName || symbol,
+    regularMarketPrice: price,
+    regularMarketChange: change,
+    regularMarketChangePercent: changePct,
+    marketCap: meta.marketCap || null,
+    regularMarketVolume: meta.regularMarketVolume || null,
+    quoteType: 'EQUITY',
+    trailingPE: null,
+    fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh || null,
+    fiftyTwoWeekLow: meta.fiftyTwoWeekLow || null,
+    trailingAnnualDividendYield: null,
+    beta: null,
+  };
+}
+
 // ── Period config ─────────────────────────────────────────────────────────────
 
 const PERIOD_CONFIG: Record<string, { months: number; resolution: string }> = {
@@ -67,7 +108,7 @@ function getGeminiClient() {
 async function startServer() {
   console.log("Initializing Express...");
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '2mb' }));
 
@@ -77,8 +118,8 @@ async function startServer() {
     const query = req.query.q as string;
     if (!query) return res.json([]);
     try {
-      const data = await fhFetch(`/search?q=${encodeURIComponent(query)}`);
-      const results = (data.result || [])
+      const fhData = await fhFetch(`/search?q=${encodeURIComponent(query)}`);
+      let results: any[] = (fhData.result || [])
         .filter((r: any) => ['Common Stock', 'ETP', 'ADR'].includes(r.type))
         .slice(0, 6)
         .map((r: any) => ({
@@ -88,6 +129,37 @@ async function startServer() {
           exchDisp: r.primaryExchange || '',
           quoteType: r.type === 'ETP' ? 'ETF' : 'EQUITY',
         }));
+
+      // Supplement with Yahoo Finance for HK stocks
+      if (results.length < 3 || /\.hk$/i.test(query)) {
+        try {
+          const yhRes = await fetch(
+            `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=6&newsCount=0&listsCount=0`,
+            { headers: { 'User-Agent': 'Mozilla/5.0' } }
+          );
+          if (yhRes.ok) {
+            const yhData = await yhRes.json();
+            const seen = new Set(results.map((r: any) => r.symbol));
+            for (const q of (yhData.quotes || []) as any[]) {
+              if (!q.symbol) continue;
+              if (q.symbol.endsWith('.HK') || results.length < 3) {
+                if (!seen.has(q.symbol)) {
+                  results.push({
+                    symbol: q.symbol,
+                    shortName: q.shortname || q.longname || q.symbol,
+                    longName: q.longname || q.shortname || q.symbol,
+                    exchDisp: q.exchange || '',
+                    quoteType: q.typeDisp || 'EQUITY',
+                  });
+                  seen.add(q.symbol);
+                }
+              }
+            }
+            results = results.slice(0, 8);
+          }
+        } catch { /* ignore fallback failure */ }
+      }
+
       res.json(results);
     } catch (e: any) {
       console.error('Search error:', e.message);
@@ -101,6 +173,11 @@ async function startServer() {
     try {
       const results = await Promise.all(
         symbols.map(async (symbol) => {
+          if (isHK(symbol)) {
+            const data = await yhFetch(symbol, '5d', '1d');
+            const meta = data.chart?.result?.[0]?.meta || {};
+            return normalizeYahooQuote(symbol, meta);
+          }
           const [quote, profile, metrics] = await Promise.all([
             fhFetch(`/quote?symbol=${symbol}`),
             getProfile(symbol).catch(() => ({})),
@@ -139,8 +216,36 @@ async function startServer() {
   app.get('/api/info', async (req: any, res: any) => {
     const symbol = req.query.symbol as string;
     const period = (req.query.period as string) || '1m';
-    const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG['1m'];
 
+    // HK stocks: Yahoo Finance v8 chart API
+    if (isHK(symbol)) {
+      try {
+        const { range, interval } = HK_PERIOD_MAP[period] ?? HK_PERIOD_MAP['1m'];
+        const data = await yhFetch(symbol, range, interval);
+        const result = data.chart?.result?.[0];
+        const meta = result?.meta || {};
+        const timestamps: number[] = result?.timestamp || [];
+        const quotes = result?.indicators?.quote?.[0] || {};
+        const chart = timestamps
+          .map((ts: number, i: number) => ({
+            date:   new Date(ts * 1000),
+            close:  quotes.close?.[i],
+            open:   quotes.open?.[i],
+            high:   quotes.high?.[i],
+            low:    quotes.low?.[i],
+            volume: quotes.volume?.[i],
+          }))
+          .filter((c: any) => c.close != null);
+        const quoteNorm = normalizeYahooQuote(symbol, meta);
+        res.json({ quote: quoteNorm, chart, news: [], quoteSummary: null });
+      } catch (e: any) {
+        console.error('HK info error:', e.message);
+        res.status(500).json({ error: e.message });
+      }
+      return;
+    }
+
+    const config = PERIOD_CONFIG[period] ?? PERIOD_CONFIG['1m'];
     const toTs   = Math.floor(Date.now() / 1000);
     const fromTs = toTs - config.months * 30 * 24 * 3600;
 

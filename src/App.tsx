@@ -185,6 +185,24 @@ export default function App() {
     );
   };
 
+  const handleSelectFromSearch = async (symbol: string, name: string) => {
+    setSearchQuery("");
+    setFilteredSearch([]);
+    if (prices[symbol]) {
+      setSelectedStock(prices[symbol]);
+      return;
+    }
+    try {
+      const data = await StockService.getStocksData([symbol]);
+      if (data[symbol]) {
+        setPrices(prev => ({ ...prev, ...data }));
+        setSelectedStock(data[symbol]);
+      }
+    } catch {
+      showToast(`Failed to load ${symbol}`, "error");
+    }
+  };
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const portfolioValue = useMemo(() =>
@@ -221,7 +239,8 @@ export default function App() {
           searchResults={filteredSearch}
           prices={prices}
           watchlist={watchlist}
-          onToggleWatchlist={symbol => { toggleWatchlist(symbol); setSearchQuery(""); }}
+          onToggleWatchlist={toggleWatchlist}
+          onSelectFromSearch={handleSelectFromSearch}
           searchInputRef={searchInputRef}
         />
 
