@@ -231,7 +231,7 @@ export default function App() {
         onRefresh={() => window.location.reload()}
       />
 
-      <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-2 min-w-0">
+      <div className="flex-1 flex flex-col gap-6 overflow-hidden pr-2 pb-2 min-w-0">
         <Header
           marketStatus={marketStatus}
           searchQuery={searchQuery}
@@ -244,51 +244,48 @@ export default function App() {
           searchInputRef={searchInputRef}
         />
 
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 grid-rows-[repeat(5,minmax(130px,1fr))] gap-6">
-          <PortfolioSummaryCard portfolioValue={portfolioValue} portfolioGain={portfolioGain} />
-
-          <div className="col-span-12 md:col-span-8 row-span-5 bento-card p-4 overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2 mb-2">
-              <h3 className="font-black text-white uppercase tracking-widest text-xs">
-                {activeTab === "portfolio" ? "Holdings" : activeTab === "watchlist" ? "Watchlist" : "AI Recommendations"}
-              </h3>
-            </div>
-            <AssetList
-              activeTab={activeTab}
-              portfolio={portfolio}
-              watchlist={watchlist}
-              prices={prices}
-              recommendations={recommendations}
-              onSelectStock={setSelectedStock}
-              onRemoveFromPortfolio={removeFromPortfolio}
-              onAddToPortfolio={addToPortfolio}
-              onToggleWatchlist={toggleWatchlist}
-              onSell={setSellSymbol}
-            />
-          </div>
-
-          <StockIntelCard
-            selectedStock={selectedStock}
+        {selectedStock ? (
+          <StockDrawer
+            inline
+            stock={selectedStock}
+            portfolioItem={portfolio.find(p => p.symbol === selectedStock.symbol)}
             aiAnalysis={aiAnalysis}
             isAnalyzing={isAnalyzing}
+            onClose={() => setSelectedStock(null)}
             onAnalyze={handleAnalyze}
+            onAddToPortfolio={addToPortfolioManual}
+            onSell={setSellSymbol}
+            showToast={showToast}
           />
-        </div>
-      </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-12 grid-rows-[repeat(5,minmax(130px,1fr))] gap-6">
+            <PortfolioSummaryCard portfolioValue={portfolioValue} portfolioGain={portfolioGain} />
 
-      {selectedStock && (
-        <StockDrawer
-          stock={selectedStock}
-          portfolioItem={portfolio.find(p => p.symbol === selectedStock.symbol)}
-          aiAnalysis={aiAnalysis}
-          isAnalyzing={isAnalyzing}
-          onClose={() => setSelectedStock(null)}
-          onAnalyze={handleAnalyze}
-          onAddToPortfolio={addToPortfolioManual}
-          onSell={setSellSymbol}
-          showToast={showToast}
-        />
-      )}
+            <div className="col-span-12 md:col-span-8 row-span-5 bento-card p-4 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 mb-2">
+                <h3 className="font-black text-white uppercase tracking-widest text-xs">
+                  {activeTab === "portfolio" ? "Holdings" : activeTab === "watchlist" ? "Watchlist" : "AI Recommendations"}
+                </h3>
+              </div>
+              <AssetList
+                activeTab={activeTab}
+                portfolio={portfolio}
+                watchlist={watchlist}
+                prices={prices}
+                recommendations={recommendations}
+                onSelectStock={setSelectedStock}
+                onSelectRecommendation={handleSelectFromSearch}
+                onRemoveFromPortfolio={removeFromPortfolio}
+                onAddToPortfolio={addToPortfolio}
+                onToggleWatchlist={toggleWatchlist}
+                onSell={setSellSymbol}
+              />
+            </div>
+
+            <StockIntelCard portfolio={portfolio} prices={prices} />
+          </div>
+        )}
+      </div>
 
       {sellSymbol && sellItem && (
         <SellModal

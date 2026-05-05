@@ -10,15 +10,22 @@ interface AssetListProps {
   prices: Record<string, Stock>;
   recommendations: Recommendation[];
   onSelectStock: (stock: Stock) => void;
+  onSelectRecommendation: (symbol: string, name: string) => void;
   onRemoveFromPortfolio: (symbol: string) => void;
   onAddToPortfolio: (symbol: string) => void;
   onToggleWatchlist: (symbol: string) => void;
   onSell: (symbol: string) => void;
 }
 
+const MARKET_LABELS: Record<string, string> = {
+  US: 'US Equities',
+  HK: 'HK Stocks',
+  ETF: 'ETFs',
+};
+
 export function AssetList({
   activeTab, portfolio, watchlist, prices, recommendations,
-  onSelectStock, onRemoveFromPortfolio, onAddToPortfolio, onToggleWatchlist, onSell
+  onSelectStock, onSelectRecommendation, onRemoveFromPortfolio, onAddToPortfolio, onToggleWatchlist, onSell
 }: AssetListProps) {
   if (activeTab === "discover") {
     if (recommendations.length === 0) {
@@ -29,38 +36,63 @@ export function AssetList({
         </div>
       );
     }
+
+    const grouped = (['US', 'HK', 'ETF'] as const).map(market => ({
+      market,
+      label: MARKET_LABELS[market],
+      items: recommendations.filter(r => r.market === market),
+    })).filter(g => g.items.length > 0);
+
     return (
-      <div className="flex-1 overflow-y-auto space-y-3 px-2 custom-scrollbar">
-        {recommendations.map(rec => (
-          <div key={rec.symbol} className="p-5 bg-white/[0.03] border border-white/[0.05] rounded-[1.5rem] flex items-center justify-between table-row-hover">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center font-black text-[10px] text-white">
-                {rec.market}
-              </div>
-              <div>
-                <div className="font-bold text-white text-sm tracking-tight">{rec.symbol}</div>
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{rec.name}</div>
-              </div>
+      <div className="flex-1 overflow-y-auto px-2 custom-scrollbar space-y-6">
+        {grouped.map(({ market, label, items }) => (
+          <div key={market}>
+            <div className="flex items-center gap-3 mb-3 px-1">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+              <div className="h-[1px] flex-1 bg-white/5" />
+              <span className="text-[9px] font-black text-slate-600">{items.length}</span>
             </div>
-            <div className="flex-1 px-8">
-              <div className="text-xs text-slate-400 italic line-clamp-2">"{rec.reason}"</div>
-              {rec.technicals && (
-                <div className="mt-2 flex gap-3 text-[9px] font-mono">
-                  <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">RSI: <span className="text-white">{rec.technicals.rsi}</span></span>
-                  <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">MACD: <span className="text-white">{rec.technicals.macd}</span></span>
+            <div className="space-y-3">
+              {items.map(rec => (
+                <div
+                  key={rec.symbol}
+                  onClick={() => onSelectRecommendation(rec.symbol, rec.name)}
+                  className="p-5 bg-white/[0.03] border border-white/[0.05] rounded-[1.5rem] flex items-center justify-between table-row-hover cursor-pointer group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center font-black text-[10px] text-white">
+                      {rec.symbol.substring(0, 3)}
+                    </div>
+                    <div>
+                      <div className="font-bold text-white text-sm tracking-tight">{rec.symbol}</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{rec.name}</div>
+                    </div>
+                  </div>
+                  <div className="flex-1 px-8">
+                    <div className="text-xs text-slate-400 italic line-clamp-2">"{rec.reason}"</div>
+                    {rec.technicals && (
+                      <div className="mt-2 flex gap-3 text-[9px] font-mono">
+                        <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">RSI: <span className="text-white">{rec.technicals.rsi}</span></span>
+                        <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">MACD: <span className="text-white">{rec.technicals.macd}</span></span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-4 items-center">
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border",
+                      rec.indicator === 'High' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10' :
+                      rec.indicator === 'Low'  ? 'text-rose-400 border-rose-400/20 bg-rose-400/10' :
+                      'text-slate-400 border-slate-400/20 bg-slate-400/10'
+                    )}>{rec.indicator}</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); onToggleWatchlist(rec.symbol); }}
+                      className="text-accent hover:text-white p-2"
+                    >
+                      {watchlist.includes(rec.symbol) ? <X size={18} /> : <Plus size={18} />}
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-            <div className="flex gap-4 items-center">
-              <span className={cn(
-                "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border",
-                rec.indicator === 'High' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10' :
-                rec.indicator === 'Low'  ? 'text-rose-400 border-rose-400/20 bg-rose-400/10' :
-                'text-slate-400 border-slate-400/20 bg-slate-400/10'
-              )}>{rec.indicator}</span>
-              <button onClick={() => onToggleWatchlist(rec.symbol)} className="text-accent hover:text-white p-2">
-                {watchlist.includes(rec.symbol) ? <X size={18} /> : <Plus size={18} />}
-              </button>
+              ))}
             </div>
           </div>
         ))}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  X, BrainCircuit, RefreshCw, TrendingUp, TrendingDown,
+  X, BrainCircuit, RefreshCw, TrendingUp, TrendingDown, ChevronLeft,
   ArrowUpRight, ChevronRight, DollarSign, Newspaper
 } from "lucide-react";
 import {
@@ -50,11 +50,13 @@ interface StockDrawerProps {
   onAddToPortfolio: (symbol: string, shares: number, buyPrice: number) => void;
   onSell: (symbol: string) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
+  inline?: boolean;
 }
 
 export function StockDrawer({
   stock, portfolioItem, aiAnalysis, isAnalyzing,
-  onClose, onAnalyze, onAddToPortfolio, onSell, showToast
+  onClose, onAnalyze, onAddToPortfolio, onSell, showToast,
+  inline = false,
 }: StockDrawerProps) {
   const [historicalData, setHistoricalData] = useState<PricePoint[]>([]);
   const [stockNews, setStockNews] = useState<any[]>([]);
@@ -63,9 +65,6 @@ export function StockDrawer({
   const [manualPrice, setManualPrice] = useState(stock.price);
   const [chartLoading, setChartLoading] = useState(false);
 
-  const isFullScreen = !!portfolioItem;
-
-  // Position P&L
   const gain    = portfolioItem ? (stock.price - portfolioItem.averagePrice) * portfolioItem.shares : 0;
   const gainPct = portfolioItem && portfolioItem.averagePrice > 0
     ? ((stock.price - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100
@@ -161,7 +160,7 @@ export function StockDrawer({
   );
 
   const StatsSection = (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 gap-3">
       {STATS.map(({ label, value, color, span }) => (
         <div key={label} className={cn("bento-card bg-white/[0.02] p-4 flex flex-col border-white/5", span === 2 ? "col-span-2" : "")}>
           <div className="flex items-center mb-2">
@@ -194,6 +193,26 @@ export function StockDrawer({
       </div>
     </section>
   ) : null;
+
+  // Delta rows shown under each price level
+  function PriceDelta({ price, fromColor, avgColor }: { price: number; fromColor: string; avgColor?: string }) {
+    const fromNow = ((price - stock.price) / stock.price) * 100;
+    const fromAvg = portfolioItem && portfolioItem.averagePrice > 0
+      ? ((price - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100
+      : null;
+    return (
+      <div className="flex flex-col items-end gap-0.5 mt-0.5">
+        <span className={cn("text-[9px] font-bold", fromColor)}>
+          {fromNow >= 0 ? "+" : ""}{fromNow.toFixed(1)}% from now
+        </span>
+        {fromAvg !== null && (
+          <span className={cn("text-[9px] font-bold", avgColor ?? fromColor)}>
+            {fromAvg >= 0 ? "+" : ""}{fromAvg.toFixed(1)}% from avg
+          </span>
+        )}
+      </div>
+    );
+  }
 
   const AISection = (
     <section className={cn(
@@ -243,11 +262,13 @@ export function StockDrawer({
                   <Hint text="AI-projected fair value 12 months out, based on fundamentals, technicals, and current momentum." />
                 </div>
                 <div className="text-4xl font-black data-value text-blue-400 tracking-tighter">${aiAnalysis.priceTarget.toFixed(2)}</div>
-                <div className="text-[10px] text-slate-500 font-bold mt-2 flex items-center gap-1 uppercase tracking-tighter">
-                  <ArrowUpRight size={12} className={aiAnalysis.priceTarget > stock.price ? "text-emerald-400" : "text-rose-400"} />
-                  {(((aiAnalysis.priceTarget - stock.price) / stock.price) * 100).toFixed(1)}%{" "}
-                  {aiAnalysis.priceTarget > stock.price ? "Appreciation" : "Correction"} expected
-                </div>
+                <PriceDelta
+                  price={aiAnalysis.priceTarget}
+                  fromColor={aiAnalysis.priceTarget >= stock.price ? "text-emerald-400" : "text-rose-400"}
+                  avgColor={portfolioItem
+                    ? (aiAnalysis.priceTarget >= portfolioItem.averagePrice ? "text-emerald-400" : "text-rose-400")
+                    : undefined}
+                />
               </div>
 
               <div className="bg-black/20 p-6 rounded-3xl border border-white/5">
@@ -256,7 +277,6 @@ export function StockDrawer({
                   <Hint text="AI-derived price levels for managing your position. Use as reference, not guarantees." />
                 </div>
 
-                {/* Avg cost reference row */}
                 {portfolioItem && (
                   <div className="bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 mb-3 flex justify-between items-center">
                     <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Your Avg Cost</span>
@@ -264,52 +284,50 @@ export function StockDrawer({
                   </div>
                 )}
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {/* Take Profit */}
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-1">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-1 mt-1">
                       <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Take Profit</span>
                       <Hint text={portfolioItem
                         ? `Target to sell for gain. Calculated from your avg cost $${portfolioItem.averagePrice.toFixed(2)}, aligned to chart resistance.`
-                        : "Target price to lock in gains. Based on your entry price and chart resistance."} />
+                        : "Target price to lock in gains. Based on entry price and chart resistance."} />
                     </div>
                     <div className="text-right">
                       <div className="font-mono font-black text-lg text-white data-value">${aiAnalysis.sellingPrice.toFixed(2)}</div>
-                      {portfolioItem && (
-                        <div className="text-[9px] text-emerald-500 font-bold">
-                          +{(((aiAnalysis.sellingPrice - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100).toFixed(1)}% from avg
-                        </div>
-                      )}
+                      <PriceDelta price={aiAnalysis.sellingPrice} fromColor="text-slate-500" avgColor="text-emerald-500" />
                     </div>
                   </div>
 
                   {/* Buy In */}
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-1">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-1 mt-1">
                       <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Buy In</span>
-                      <Hint text="Optimal entry based on current market price and chart support levels. Not related to your avg cost." />
+                      <Hint text="Optimal entry based on current market price and chart support levels." />
                     </div>
                     <div className="text-right">
                       <div className="font-mono font-black text-lg text-white data-value">${aiAnalysis.buyInPrice.toFixed(2)}</div>
-                      <div className="text-[9px] text-slate-600 font-bold">market support</div>
+                      <PriceDelta price={aiAnalysis.buyInPrice} fromColor="text-slate-500" avgColor="text-blue-400" />
                     </div>
                   </div>
 
                   {/* Cut Loss */}
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-1">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-1 mt-1">
                       <span className="text-[9px] font-black uppercase tracking-widest text-rose-500">Cut Loss</span>
                       <Hint text={portfolioItem
-                        ? `Stop-loss below current price. Exit here to limit downside. Your loss from avg cost would be ${(((aiAnalysis.cutLossPrice - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100).toFixed(1)}%.`
+                        ? `Stop-loss below current price. Exit here to limit downside.`
                         : "Stop-loss price. Exit to cap downside. Typically 5–15% below current price."} />
                     </div>
                     <div className="text-right">
                       <div className="font-mono font-black text-lg text-white data-value">${aiAnalysis.cutLossPrice.toFixed(2)}</div>
-                      {portfolioItem && (
-                        <div className={cn("text-[9px] font-bold", aiAnalysis.cutLossPrice < portfolioItem.averagePrice ? "text-rose-500" : "text-slate-500")}>
-                          {(((aiAnalysis.cutLossPrice - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100).toFixed(1)}% from avg
-                        </div>
-                      )}
+                      <PriceDelta
+                        price={aiAnalysis.cutLossPrice}
+                        fromColor="text-slate-500"
+                        avgColor={portfolioItem
+                          ? (aiAnalysis.cutLossPrice < portfolioItem.averagePrice ? "text-rose-500" : "text-slate-500")
+                          : undefined}
+                      />
                     </div>
                   </div>
                 </div>
@@ -323,17 +341,15 @@ export function StockDrawer({
                   <div className="text-[9px] text-slate-500 font-black tracking-widest uppercase">
                     Model Conviction {(aiAnalysis.confidence * 100).toFixed(0)}%
                   </div>
-                  <Hint text="AI confidence score based on signal alignment across technicals, fundamentals, and news. Above 70% = strong conviction." />
+                  <Hint text="AI confidence score based on signal alignment. Above 70% = strong conviction." />
                 </div>
               </div>
             </div>
 
             {/* Summary */}
-            <div className="relative">
-              <p className="text-slate-400 text-sm leading-relaxed font-medium bg-black/20 p-6 rounded-3xl italic border-l-4 border-blue-600">
-                "{aiAnalysis.summary}"
-              </p>
-            </div>
+            <p className="text-slate-400 text-sm leading-relaxed font-medium bg-black/20 p-6 rounded-3xl italic border-l-4 border-blue-600">
+              "{aiAnalysis.summary}"
+            </p>
 
             {/* News insight */}
             {aiAnalysis.newsInsight && (
@@ -353,7 +369,7 @@ export function StockDrawer({
                 <div className="flex-1 bg-white/[0.04] p-4 rounded-2xl border border-white/5 text-center">
                   <div className="flex items-center justify-center mb-2">
                     <div className="text-[9px] text-slate-500 uppercase font-black">RSI (14)</div>
-                    <Hint text="Relative Strength Index. Above 70 = overbought (may pull back). Below 30 = oversold (may bounce). 30–70 = neutral." />
+                    <Hint text="Relative Strength Index. Above 70 = overbought. Below 30 = oversold. 30–70 = neutral." />
                   </div>
                   <div className={cn("text-lg font-black",
                     aiAnalysis.technicals.rsi > 70 ? "text-rose-400" :
@@ -366,14 +382,13 @@ export function StockDrawer({
                 <div className="flex-1 bg-white/[0.04] p-4 rounded-2xl border border-white/5 text-center">
                   <div className="flex items-center justify-center mb-2">
                     <div className="text-[9px] text-slate-500 uppercase font-black">MACD</div>
-                    <Hint text="Moving Average Convergence Divergence. Positive = bullish momentum. Negative = bearish. Watch for signal line crossovers." />
+                    <Hint text="Positive = bullish momentum. Negative = bearish. Watch for signal line crossovers." />
                   </div>
                   <div className={cn("text-lg font-black font-mono",
                     aiAnalysis.technicals.macd.startsWith('+') ? "text-emerald-400" : "text-rose-400"
                   )}>{aiAnalysis.technicals.macd}</div>
                   <div className="flex items-center justify-center mt-1">
                     <div className="text-[8px] text-slate-600 uppercase font-black">Signal: {aiAnalysis.technicals.signal}</div>
-                    <Hint text="MACD Signal line. When MACD crosses above = bullish. Below = bearish crossover." />
                   </div>
                 </div>
               </div>
@@ -412,7 +427,131 @@ export function StockDrawer({
     </section>
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const PositionCard = portfolioItem ? (
+    <div className="bento-card bg-white/[0.02] border-white/5 p-6 space-y-3 shrink-0">
+      <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Your Position</div>
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500 font-bold uppercase tracking-widest">Shares</span>
+        <span className="text-white font-black">{portfolioItem.shares}</span>
+      </div>
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500 font-bold uppercase tracking-widest">Avg Cost</span>
+        <span className="text-white font-black">${portfolioItem.averagePrice.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500 font-bold uppercase tracking-widest">Total Cost</span>
+        <span className="text-white font-black">${portfolioItem.totalCost.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500 font-bold uppercase tracking-widest">Market Value</span>
+        <span className="text-white font-black">${(stock.price * portfolioItem.shares).toFixed(2)}</span>
+      </div>
+      <div className="border-t border-white/5 pt-3 flex justify-between items-center">
+        <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Unrealized P&L</span>
+        <div className={cn("flex items-center gap-1 font-black text-sm", gain >= 0 ? "text-emerald-400" : "text-rose-400")}>
+          {gain >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+          {gain >= 0 ? "+" : ""}${Math.abs(gain).toFixed(2)}
+          <span className="text-[10px]">({gainPct.toFixed(1)}%)</span>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const TradePanel = (
+    <div className="bento-card bg-white/[0.02] border-white/5 p-6 space-y-4 shrink-0">
+      <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Execute Trade</div>
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Entry Price</label>
+          <div className="flex items-center bg-black/40 p-3 rounded-2xl border border-white/10">
+            <input type="number" value={manualPrice || ""} onChange={e => setManualPrice(parseFloat(e.target.value) || 0)}
+              className="bg-transparent w-full text-sm font-black text-white outline-none"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Shares</label>
+          <div className="flex items-center bg-black/40 p-3 rounded-2xl border border-white/10">
+            <input type="number" value={tradeAmount || ""} onChange={e => setTradeAmount(parseInt(e.target.value) || 0)}
+              placeholder="Qty" className="bg-transparent w-full text-sm font-black text-white outline-none"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <button
+          onClick={async () => {
+            try { await onAddToPortfolio(stock.symbol, tradeAmount, manualPrice); setTradeAmount(0); }
+            catch (e: any) { showToast(`Error: ${e.message}`, 'error'); }
+          }}
+          className="flex-1 bg-white text-black py-3 rounded-2xl font-black flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-xl shadow-white/5 active:scale-95 text-xs uppercase tracking-widest"
+        >
+          Confirm Buy
+        </button>
+        {portfolioItem && (
+          <button onClick={() => onSell(stock.symbol)}
+            className="flex items-center gap-2 px-5 py-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+          >
+            <DollarSign size={16} /> Sell
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Inline full-width render ───────────────────────────────────────────────
+
+  if (inline) {
+    return (
+      <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-hidden">
+        {/* Nav bar */}
+        <div className="flex items-center gap-4 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-white/20 px-3 py-2 rounded-xl"
+          >
+            <ChevronLeft size={14} /> Back
+          </button>
+          <div className="h-4 w-[1px] bg-white/10" />
+          <div className="flex items-baseline gap-3 min-w-0 overflow-hidden">
+            <span className="text-white font-black text-xl shrink-0">{stock.symbol}</span>
+            <span className="text-slate-500 text-sm font-medium truncate">{stock.name}</span>
+            <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest shrink-0 hidden lg:block">{stock.sector}</span>
+          </div>
+          <div className="ml-auto text-right shrink-0">
+            <div className="text-xl font-black text-white">${stock.price.toFixed(2)}</div>
+            <div className={cn("text-xs font-black flex items-center justify-end gap-1", stock.change >= 0 ? "text-emerald-400" : "text-rose-400")}>
+              {stock.change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {stock.change >= 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%
+            </div>
+          </div>
+        </div>
+
+        {/* 3-column body */}
+        <div className="flex-1 grid grid-cols-[1fr_1.1fr_0.75fr] gap-6 min-h-0 overflow-hidden">
+          {/* Left: Chart + Stats + News */}
+          <div className="overflow-y-auto space-y-6 custom-scrollbar pr-1">
+            {ChartSection}
+            {StatsSection}
+            {NewsSection}
+          </div>
+          {/* Center: AI Analysis */}
+          <div className="overflow-y-auto custom-scrollbar pr-1">
+            {AISection}
+          </div>
+          {/* Right: Position + Trade */}
+          <div className="overflow-y-auto space-y-4 custom-scrollbar pr-1">
+            {PositionCard}
+            {TradePanel}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Overlay slide-over render ─────────────────────────────────────────────
+
+  const isFullScreen = !!portfolioItem;
 
   return (
     <AnimatePresence>
@@ -430,7 +569,6 @@ export function StockDrawer({
           )}
           onClick={e => e.stopPropagation()}
         >
-          {/* Header */}
           <header className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-surface sticky top-0 z-10 shrink-0">
             <div>
               <h3 className="text-3xl font-black text-white flex items-baseline gap-3">
@@ -439,7 +577,6 @@ export function StockDrawer({
               </h3>
               <div className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.3em] mt-1">{stock.sector}</div>
             </div>
-            {/* Current price always in header */}
             <div className="flex items-center gap-6">
               <div className="text-right">
                 <div className="text-2xl font-black text-white">${stock.price.toFixed(2)}</div>
@@ -456,51 +593,19 @@ export function StockDrawer({
             </div>
           </header>
 
-          {/* Body */}
           {isFullScreen ? (
-            // Two-column layout for holdings view
             <div className="flex-1 overflow-hidden grid grid-cols-[1.1fr_1fr] min-h-0">
-              {/* Left: chart + stats + news */}
               <div className="overflow-y-auto p-8 space-y-8 border-r border-white/5 custom-scrollbar">
                 {ChartSection}
                 {StatsSection}
                 {NewsSection}
               </div>
-              {/* Right: position summary + AI analysis */}
               <div className="overflow-y-auto p-8 space-y-8 custom-scrollbar">
-                {/* Position summary card */}
-                <div className="bento-card bg-white/[0.02] border-white/5 p-6 space-y-3">
-                  <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-3">Your Position</div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500 font-bold uppercase tracking-widest">Shares</span>
-                    <span className="text-white font-black">{portfolioItem.shares}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500 font-bold uppercase tracking-widest">Avg Cost</span>
-                    <span className="text-white font-black">${portfolioItem.averagePrice.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500 font-bold uppercase tracking-widest">Total Cost</span>
-                    <span className="text-white font-black">${portfolioItem.totalCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500 font-bold uppercase tracking-widest">Market Value</span>
-                    <span className="text-white font-black">${(stock.price * portfolioItem.shares).toFixed(2)}</span>
-                  </div>
-                  <div className="border-t border-white/5 pt-3 flex justify-between items-center">
-                    <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Unrealized P&L</span>
-                    <div className={cn("flex items-center gap-1 font-black text-sm", gain >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                      {gain >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                      {gain >= 0 ? "+" : ""}${Math.abs(gain).toFixed(2)}
-                      <span className="text-[10px]">({gainPct.toFixed(1)}%)</span>
-                    </div>
-                  </div>
-                </div>
+                {PositionCard}
                 {AISection}
               </div>
             </div>
           ) : (
-            // Single-column side panel for watchlist/search view
             <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
               {ChartSection}
               {StatsSection}
@@ -509,7 +614,6 @@ export function StockDrawer({
             </div>
           )}
 
-          {/* Footer — buy / sell */}
           <footer className="px-8 py-6 border-t border-white/5 space-y-4 bg-surface sticky bottom-0 z-10 shadow-[0_-20px_40px_rgba(0,0,0,0.4)] shrink-0">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
