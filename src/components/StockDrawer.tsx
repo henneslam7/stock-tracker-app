@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X, BrainCircuit, RefreshCw, TrendingUp, TrendingDown, ChevronLeft,
@@ -20,12 +21,32 @@ const TIMEFRAMES: { label: string; value: ChartTimeframe }[] = [
 ];
 
 function Hint({ text }: { text: string }) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const ref = useRef<HTMLSpanElement>(null);
+
   return (
-    <div className="relative group/hint inline-flex items-center ml-1">
-      <span className="text-[8px] text-slate-700 hover:text-slate-400 cursor-help font-black border border-slate-700/60 rounded-full w-3.5 h-3.5 flex items-center justify-center transition-colors">?</span>
-      <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-[#0d0f13] border border-white/10 rounded-xl text-[10px] text-slate-300 w-56 z-[200] opacity-0 group-hover/hint:opacity-100 transition-opacity pointer-events-none shadow-2xl leading-relaxed">
-        {text}
-      </div>
+    <div className="inline-flex items-center ml-1">
+      <span
+        ref={ref}
+        onMouseEnter={() => ref.current && setRect(ref.current.getBoundingClientRect())}
+        onMouseLeave={() => setRect(null)}
+        className="text-[8px] text-slate-700 hover:text-slate-400 cursor-help font-black border border-slate-700/60 rounded-full w-3.5 h-3.5 flex items-center justify-center transition-colors"
+      >?</span>
+      {rect && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: rect.top - 8,
+            left: Math.min(rect.left, window.innerWidth - 232),
+            transform: 'translateY(-100%)',
+            zIndex: 9999,
+          }}
+          className="px-3 py-2 bg-[#0d0f13] border border-white/10 rounded-xl text-[10px] text-slate-300 w-56 shadow-2xl leading-relaxed pointer-events-none"
+        >
+          {text}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
