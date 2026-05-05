@@ -64,6 +64,7 @@ export interface Recommendation {
   market: 'US' | 'HK' | 'ETF';
   reason: string;
   indicator: Sentiment;
+  tier: 'standard' | 'contrarian';
   technicals?: {
     rsi: string | number;
     macd: string;

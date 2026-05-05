@@ -429,17 +429,30 @@ Output JSON (strict schema, no extra keys):
       const ai = getGeminiClient();
 
       const prompt = `
-Provide exactly 5 recommendations for each of 3 categories (15 total):
-1. US Market Equities
-2. HK Market Equities (symbol ends in .HK, e.g., 0700.HK)
-3. Global ETFs (e.g., SPY, QQQ)
+You are a contrarian quant analyst. Provide exactly 10 recommendations for each of 3 markets (30 total):
 
-Output pure JSON array, no markdown. 'reason' must be in Cantonese.
+Markets:
+1. US equities
+2. HK equities (symbol must end in .HK, e.g. 0700.HK, 9988.HK)
+3. Global ETFs (e.g. SPY, QQQ, ARKK, SOXS)
+
+For each market, split into two tiers:
+- "standard" (5 picks): conventional, high-quality, well-known names with solid fundamentals and clear catalysts. Safe mainstream consensus.
+- "contrarian" (5 picks): deeply unconventional, against current market consensus. Pick from: beaten-down fallen angels, heavily shorted squeeze candidates, overlooked micro/small-caps, sector outliers, inverse/leveraged plays, or names with controversial thesis. Must genuinely surprise a seasoned trader. Do NOT pick obvious large-caps for this tier.
+
+Rules:
+- All 'reason' fields in Cantonese (Traditional Chinese)
+- Output ONLY a raw JSON array, zero markdown, zero code fences
+- Vary the picks — no duplicates across tiers or markets
+- Contrarian picks should have diverse, creative rationale
+
+Schema (30 objects total):
 [{
   "symbol": string,
   "name": string,
   "market": "US"|"HK"|"ETF",
-  "reason": string (Cantonese),
+  "tier": "standard"|"contrarian",
+  "reason": string (Cantonese, 1-2 sentences explaining the thesis),
   "indicator": "High"|"Mild"|"Low",
   "technicals": { "rsi": string, "macd": string }
 }]`;

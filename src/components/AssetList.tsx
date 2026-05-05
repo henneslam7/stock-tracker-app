@@ -23,6 +23,75 @@ const MARKET_LABELS: Record<string, string> = {
   ETF: 'ETFs',
 };
 
+function RecCard({
+  rec, isContrarian, watchlist, onSelect, onToggleWatchlist,
+}: {
+  rec: Recommendation;
+  isContrarian: boolean;
+  watchlist: string[];
+  onSelect: (symbol: string, name: string) => void;
+  onToggleWatchlist: (symbol: string) => void;
+}) {
+  return (
+    <div
+      onClick={() => onSelect(rec.symbol, rec.name)}
+      className={cn(
+        "p-5 rounded-[1.5rem] flex items-center justify-between cursor-pointer group transition-all",
+        isContrarian
+          ? "bg-amber-500/[0.04] border border-amber-500/20 hover:bg-amber-500/[0.08]"
+          : "bg-white/[0.03] border border-white/[0.05] table-row-hover"
+      )}
+    >
+      <div className="flex items-center gap-4">
+        <div className={cn(
+          "w-12 h-12 rounded-xl border flex items-center justify-center font-black text-[10px]",
+          isContrarian
+            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+            : "bg-black border-white/10 text-white"
+        )}>
+          {rec.symbol.substring(0, 4)}
+        </div>
+        <div>
+          <div className="font-bold text-white text-sm tracking-tight flex items-center gap-2">
+            {rec.symbol}
+            {isContrarian && (
+              <span className="text-[8px] font-black uppercase tracking-widest text-amber-500 border border-amber-500/40 rounded px-1.5 py-0.5">
+                Contrarian
+              </span>
+            )}
+          </div>
+          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{rec.name}</div>
+        </div>
+      </div>
+      <div className="flex-1 px-8">
+        <div className={cn("text-xs italic line-clamp-2", isContrarian ? "text-amber-200/60" : "text-slate-400")}>
+          "{rec.reason}"
+        </div>
+        {rec.technicals && (
+          <div className="mt-2 flex gap-3 text-[9px] font-mono">
+            <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">RSI: <span className="text-white">{rec.technicals.rsi}</span></span>
+            <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">MACD: <span className="text-white">{rec.technicals.macd}</span></span>
+          </div>
+        )}
+      </div>
+      <div className="flex gap-4 items-center">
+        <span className={cn(
+          "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border",
+          rec.indicator === 'High' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10' :
+          rec.indicator === 'Low'  ? 'text-rose-400 border-rose-400/20 bg-rose-400/10' :
+          'text-slate-400 border-slate-400/20 bg-slate-400/10'
+        )}>{rec.indicator}</span>
+        <button
+          onClick={e => { e.stopPropagation(); onToggleWatchlist(rec.symbol); }}
+          className="text-accent hover:text-white p-2"
+        >
+          {watchlist.includes(rec.symbol) ? <X size={18} /> : <Plus size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AssetList({
   activeTab, portfolio, watchlist, prices, recommendations,
   onSelectStock, onSelectRecommendation, onRemoveFromPortfolio, onAddToPortfolio, onToggleWatchlist, onSell
@@ -40,60 +109,59 @@ export function AssetList({
     const grouped = (['US', 'HK', 'ETF'] as const).map(market => ({
       market,
       label: MARKET_LABELS[market],
-      items: recommendations.filter(r => r.market === market),
-    })).filter(g => g.items.length > 0);
+      standard:    recommendations.filter(r => r.market === market && r.tier !== 'contrarian'),
+      contrarian:  recommendations.filter(r => r.market === market && r.tier === 'contrarian'),
+    })).filter(g => g.standard.length > 0 || g.contrarian.length > 0);
 
     return (
-      <div className="flex-1 overflow-y-auto px-2 custom-scrollbar space-y-6">
-        {grouped.map(({ market, label, items }) => (
+      <div className="flex-1 overflow-y-auto px-2 custom-scrollbar space-y-8">
+        {grouped.map(({ market, label, standard, contrarian }) => (
           <div key={market}>
-            <div className="flex items-center gap-3 mb-3 px-1">
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+            {/* Market header */}
+            <div className="flex items-center gap-3 mb-4 px-1">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</span>
               <div className="h-[1px] flex-1 bg-white/5" />
-              <span className="text-[9px] font-black text-slate-600">{items.length}</span>
+              <span className="text-[9px] font-black text-slate-600">{standard.length + contrarian.length}</span>
             </div>
-            <div className="space-y-3">
-              {items.map(rec => (
-                <div
-                  key={rec.symbol}
-                  onClick={() => onSelectRecommendation(rec.symbol, rec.name)}
-                  className="p-5 bg-white/[0.03] border border-white/[0.05] rounded-[1.5rem] flex items-center justify-between table-row-hover cursor-pointer group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center font-black text-[10px] text-white">
-                      {rec.symbol.substring(0, 3)}
-                    </div>
-                    <div>
-                      <div className="font-bold text-white text-sm tracking-tight">{rec.symbol}</div>
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{rec.name}</div>
-                    </div>
-                  </div>
-                  <div className="flex-1 px-8">
-                    <div className="text-xs text-slate-400 italic line-clamp-2">"{rec.reason}"</div>
-                    {rec.technicals && (
-                      <div className="mt-2 flex gap-3 text-[9px] font-mono">
-                        <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">RSI: <span className="text-white">{rec.technicals.rsi}</span></span>
-                        <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">MACD: <span className="text-white">{rec.technicals.macd}</span></span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-4 items-center">
-                    <span className={cn(
-                      "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border",
-                      rec.indicator === 'High' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10' :
-                      rec.indicator === 'Low'  ? 'text-rose-400 border-rose-400/20 bg-rose-400/10' :
-                      'text-slate-400 border-slate-400/20 bg-slate-400/10'
-                    )}>{rec.indicator}</span>
-                    <button
-                      onClick={e => { e.stopPropagation(); onToggleWatchlist(rec.symbol); }}
-                      className="text-accent hover:text-white p-2"
-                    >
-                      {watchlist.includes(rec.symbol) ? <X size={18} /> : <Plus size={18} />}
-                    </button>
-                  </div>
+
+            {/* Standard picks */}
+            {standard.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">Standard Picks</span>
                 </div>
-              ))}
-            </div>
+                <div className="space-y-2">
+                  {standard.map(rec => (
+                    <div key={rec.symbol}>
+                      <RecCard rec={rec} isContrarian={false}
+                        watchlist={watchlist} onSelect={onSelectRecommendation} onToggleWatchlist={onToggleWatchlist}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Contrarian picks */}
+            {contrarian.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="text-[8px] font-black uppercase tracking-widest text-amber-600">Contrarian Picks</span>
+                  <span className="text-[7px] text-amber-700 font-bold italic">— against consensus</span>
+                </div>
+                <div className="space-y-2">
+                  {contrarian.map(rec => (
+                    <div key={rec.symbol}>
+                      <RecCard rec={rec} isContrarian={true}
+                        watchlist={watchlist} onSelect={onSelectRecommendation} onToggleWatchlist={onToggleWatchlist}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
