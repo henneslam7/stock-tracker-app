@@ -48,6 +48,7 @@ export interface AIAnalysis {
   cutLossPrice: number;
   confidence: number;
   summary: string;
+  newsInsight?: string;
   risks: string[];
   opportunities: string[];
   technicals?: {
