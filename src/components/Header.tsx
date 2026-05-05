@@ -23,8 +23,11 @@ export function Header({
     <div className="flex-none flex items-center justify-between px-2">
       <div>
         <h1 className="text-3xl font-black tracking-tighter text-white">Market Intel</h1>
-        <p className="text-slate-500 text-sm font-medium">
+        <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
           Portfolio Tracking • <span className="text-emerald-400 font-bold">Analysis Active</span>
+          <span className="text-[9px] font-black text-slate-600 border border-slate-700/60 rounded px-1.5 py-0.5 tracking-widest">
+            v{__APP_VERSION__}
+          </span>
         </p>
       </div>
 
