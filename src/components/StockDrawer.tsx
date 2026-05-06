@@ -157,7 +157,7 @@ export function StockDrawer({
   // ── Reusable sections ──────────────────────────────────────────────────────
 
   const ChartSection = (
-    <section className="bento-card p-6 overflow-hidden border-none bg-black/40 flex flex-col" style={{ minHeight: '18rem' }}>
+    <section className="bento-card p-6 overflow-hidden border-none bg-black/40 flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Historical Trend</span>
         <div className="flex gap-1">
@@ -173,7 +173,7 @@ export function StockDrawer({
           ))}
         </div>
       </div>
-      <div className="flex-1 min-h-0 relative">
+      <div className="relative" style={{ height: '220px' }}>
         {chartLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <RefreshCw size={20} className="animate-spin text-slate-500" />
