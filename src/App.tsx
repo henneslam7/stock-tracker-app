@@ -6,7 +6,13 @@ import { analyzeStock, getRecommendations } from "./services/geminiService";
 import { calculateRSI, calculateMACD } from "./lib/indicators";
 import { getMarketStatus } from "./lib/marketUtils";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { useAuth } from "./hooks/useAuth";
 import { INITIAL_WATCHLIST } from "./constants";
+import {
+  loginWithGoogle,
+  syncPortfolioToDb, loadPortfolioFromDb, deletePortfolioItemDb,
+  syncWatchlistToDb, loadWatchlistFromDb, deleteWatchlistItemDb,
+} from "./lib/firebase";
 
 import { Sidebar } from "./components/Sidebar";
 import { Header } from "./components/Header";
@@ -15,10 +21,18 @@ import { AssetList } from "./components/AssetList";
 import { StockIntelCard } from "./components/StockIntelCard";
 import { StockDrawer } from "./components/StockDrawer";
 import { SellModal } from "./components/SellModal";
+import { AdminPortal } from "./components/AdminPortal";
+import { SubscribeModal } from "./components/SubscribeModal";
+import { UserMenu } from "./components/UserMenu";
+import { AuthModal } from "./components/AuthModal";
 import { Toast } from "./components/ui/Toast";
 import { ConfirmModal } from "./components/ui/Modal";
 
 export default function App() {
+  // Auth
+  const { user, loading: authLoading, refreshUser } = useAuth();
+  const [dbLoaded, setDbLoaded] = useState(false);
+
   // Data
   const [portfolio, setPortfolio] = useLocalStorage<PortfolioItem[]>("stock_tracker_portfolio", []);
   const [watchlist, setWatchlist] = useLocalStorage<string[]>("stock_tracker_watchlist", INITIAL_WATCHLIST);
@@ -31,6 +45,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("portfolio");
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredSearch, setFilteredSearch] = useState<any[]>([]);
+  const [showAdmin, setShowAdmin] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // AI
@@ -41,11 +56,50 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [sellSymbol, setSellSymbol] = useState<string | null>(null);
+  const [showSubscribe, setShowSubscribe] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // ── Stripe return URL handling ──────────────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('subscribed') === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+      refreshUser();
+      showToast('Subscription activated! AI Analysis unlocked.');
+    } else if (params.get('subscribed') === '0') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // ── Load from Firestore on login ────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) { setDbLoaded(false); return; }
+    Promise.all([
+      loadPortfolioFromDb(user.uid).catch(() => [] as PortfolioItem[]),
+      loadWatchlistFromDb(user.uid).catch(() => [] as string[]),
+    ]).then(([dbPortfolio, dbWatchlist]) => {
+      if (dbPortfolio.length > 0) setPortfolio(dbPortfolio);
+      if (dbWatchlist.length > 0) setWatchlist(dbWatchlist);
+      setDbLoaded(true);
+    }).catch(() => setDbLoaded(true));
+  }, [user?.uid]);
+
+  // ── Sync portfolio to Firestore on changes ─────────────────────────────────
+  useEffect(() => {
+    if (!user || !dbLoaded) return;
+    syncPortfolioToDb(user.uid, portfolio).catch(() => {});
+  }, [portfolio, user?.uid, dbLoaded]);
+
+  // ── Sync watchlist to Firestore on changes ─────────────────────────────────
+  useEffect(() => {
+    if (!user || !dbLoaded) return;
+    syncWatchlistToDb(user.uid, watchlist).catch(() => {});
+  }, [watchlist, user?.uid, dbLoaded]);
 
   // Market clock
   useEffect(() => {
@@ -92,6 +146,10 @@ export default function App() {
 
   const handleAnalyze = async () => {
     if (!selectedStock) return;
+    // Gate: must be logged in + subscribed (or admin)
+    if (!user) { setShowAuthModal(true); return; }
+    if (!user.isSubscribed && !user.isAdmin) { setShowSubscribe(true); return; }
+
     setIsAnalyzing(true);
     try {
       const info = await StockService.getStockInfo(selectedStock.symbol);
@@ -152,6 +210,7 @@ export default function App() {
     let updated: PortfolioItem[];
     if (sharesToSell >= item.shares) {
       updated = portfolio.filter(p => p.symbol !== symbol);
+      if (user) deletePortfolioItemDb(user.uid, symbol).catch(() => {});
     } else {
       const newShares = item.shares - sharesToSell;
       updated = portfolio.map(p =>
@@ -170,6 +229,7 @@ export default function App() {
 
   const removeFromPortfolio = (symbol: string) => {
     setPortfolio(portfolio.filter(p => p.symbol !== symbol));
+    if (user) deletePortfolioItemDb(user.uid, symbol).catch(() => {});
   };
 
   const addToPortfolio = (symbol: string) => {
@@ -179,10 +239,12 @@ export default function App() {
   };
 
   const toggleWatchlist = (symbol: string) => {
-    setWatchlist(watchlist.includes(symbol)
-      ? watchlist.filter(s => s !== symbol)
-      : [...watchlist, symbol]
-    );
+    if (watchlist.includes(symbol)) {
+      setWatchlist(watchlist.filter(s => s !== symbol));
+      if (user) deleteWatchlistItemDb(user.uid, symbol).catch(() => {});
+    } else {
+      setWatchlist([...watchlist, symbol]);
+    }
   };
 
   const handleSelectFromSearch = async (symbol: string, name: string) => {
@@ -220,6 +282,7 @@ export default function App() {
   }, [portfolio, portfolioValue, prices]);
 
   const sellItem = sellSymbol ? portfolio.find(p => p.symbol === sellSymbol) : undefined;
+  const canAnalyze = !!(user && (user.isSubscribed || user.isAdmin));
 
   return (
     <div className="flex h-screen bg-bg text-ink font-sans overflow-hidden p-3 md:p-6 gap-3 md:gap-6">
@@ -242,20 +305,31 @@ export default function App() {
           onToggleWatchlist={toggleWatchlist}
           onSelectFromSearch={handleSelectFromSearch}
           searchInputRef={searchInputRef}
+          userMenu={
+            <UserMenu
+              user={user}
+              loading={authLoading}
+              onAdminPortal={() => setShowAdmin(true)}
+            />
+          }
         />
 
-        {selectedStock ? (
+        {showAdmin ? (
+          <AdminPortal onBack={() => setShowAdmin(false)} />
+        ) : selectedStock ? (
           <StockDrawer
             inline
             stock={selectedStock}
             portfolioItem={portfolio.find(p => p.symbol === selectedStock.symbol)}
             aiAnalysis={aiAnalysis}
             isAnalyzing={isAnalyzing}
+            canAnalyze={canAnalyze}
             onClose={() => setSelectedStock(null)}
             onAnalyze={handleAnalyze}
             onAddToPortfolio={addToPortfolioManual}
             onSell={setSellSymbol}
             showToast={showToast}
+            onSubscribeRequired={() => setShowSubscribe(true)}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-12 md:grid-rows-[repeat(5,minmax(130px,1fr))] md:overflow-hidden md:flex-1 gap-4 md:gap-6">
@@ -306,6 +380,20 @@ export default function App() {
         message={confirmModal?.message ?? ""}
         onConfirm={confirmModal?.onConfirm ?? (() => {})}
         onClose={() => setConfirmModal(null)}
+      />
+
+      <SubscribeModal
+        isOpen={showSubscribe}
+        isLoggedIn={!!user}
+        onClose={() => setShowSubscribe(false)}
+        onLoginRequired={() => { setShowSubscribe(false); setShowAuthModal(true); }}
+      />
+
+      <AuthModal
+        isOpen={showAuthModal}
+        feature="AI Analysis"
+        onClose={() => setShowAuthModal(false)}
+        onLogin={loginWithGoogle}
       />
 
       <Toast message={toast?.message ?? null} type={toast?.type} />

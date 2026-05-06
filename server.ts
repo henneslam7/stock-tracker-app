@@ -4,9 +4,47 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import Stripe from 'stripe';
+import { initializeApp as initAdminApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 console.log("Starting server process...");
 dotenv.config();
+
+// ── Firebase Admin ────────────────────────────────────────────────────────────
+
+function ensureAdminApp() {
+  if (getApps().length) return;
+  const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!svcJson) throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON not set');
+  initAdminApp({ credential: cert(JSON.parse(svcJson)) });
+}
+
+function getAdminFirestore() {
+  ensureAdminApp();
+  const dbId = process.env.FIREBASE_DATABASE_ID;
+  return dbId ? getFirestore(dbId) : getFirestore();
+}
+
+async function verifyToken(authHeader: string | undefined) {
+  if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing auth token');
+  ensureAdminApp();
+  return getAuth().verifyIdToken(authHeader.split(' ')[1]);
+}
+
+function isAdminEmail(email: string): boolean {
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  return adminEmails.includes(email.toLowerCase());
+}
+
+// ── Stripe ────────────────────────────────────────────────────────────────────
+
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY not set');
+  return new Stripe(key);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -469,6 +507,117 @@ Schema (30 objects total):
     } catch (e: any) {
       console.error('Recommendations error:', e.message);
       res.json([]);
+    }
+  });
+
+  // ── Stripe ───────────────────────────────────────────────────────────────────
+
+  app.post('/api/stripe/create-checkout-session', async (req: any, res: any) => {
+    try {
+      const decoded = await verifyToken(req.headers.authorization);
+      const stripe = getStripe();
+      const priceId = process.env.STRIPE_PRICE_ID;
+      if (!priceId) return res.status(500).json({ error: 'STRIPE_PRICE_ID not configured' });
+      const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${appUrl}?subscribed=1`,
+        cancel_url:  `${appUrl}?subscribed=0`,
+        customer_email: decoded.email || undefined,
+        metadata: { userId: decoded.uid },
+      });
+      res.json({ url: session.url });
+    } catch (e: any) {
+      console.error('Stripe session error:', e.message);
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req: any, res: any) => {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) return res.status(500).send('Webhook secret not configured');
+    let event: Stripe.Event;
+    try {
+      event = getStripe().webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (e: any) {
+      console.error('Stripe webhook signature error:', e.message);
+      return res.status(400).send(`Webhook error: ${e.message}`);
+    }
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const userId = session.metadata?.userId;
+      if (userId) {
+        try {
+          const db = getAdminFirestore();
+          await db.collection('users').doc(userId).set(
+            { isSubscribed: true, subscriptionSource: 'stripe', updatedAt: FieldValue.serverTimestamp() },
+            { merge: true }
+          );
+        } catch (e: any) { console.error('Firestore update error:', e.message); }
+      }
+    }
+    if (event.type === 'customer.subscription.deleted') {
+      const sub = event.data.object as Stripe.Subscription;
+      const userId = (sub.metadata as any)?.userId;
+      if (userId) {
+        try {
+          const db = getAdminFirestore();
+          await db.collection('users').doc(userId).set(
+            { isSubscribed: false, updatedAt: FieldValue.serverTimestamp() },
+            { merge: true }
+          );
+        } catch (e: any) { console.error('Firestore update error:', e.message); }
+      }
+    }
+    res.json({ received: true });
+  });
+
+  // ── Admin API ─────────────────────────────────────────────────────────────────
+
+  app.get('/api/admin/users', async (req: any, res: any) => {
+    try {
+      const decoded = await verifyToken(req.headers.authorization);
+      if (!isAdminEmail(decoded.email || '')) return res.status(403).json({ error: 'Forbidden' });
+      const db = getAdminFirestore();
+      const snap = await db.collection('users').get();
+      const users = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          uid: d.id,
+          email: data.email || '',
+          displayName: data.displayName || '',
+          isSubscribed: data.isSubscribed ?? false,
+          isAdmin: data.isAdmin ?? false,
+          subscriptionSource: data.subscriptionSource || null,
+          createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+        };
+      });
+      res.json(users);
+    } catch (e: any) {
+      console.error('Admin users error:', e.message);
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.patch('/api/admin/users/:uid/subscription', async (req: any, res: any) => {
+    try {
+      const decoded = await verifyToken(req.headers.authorization);
+      if (!isAdminEmail(decoded.email || '')) return res.status(403).json({ error: 'Forbidden' });
+      const { uid } = req.params;
+      const { isSubscribed } = req.body;
+      if (typeof isSubscribed !== 'boolean') return res.status(400).json({ error: 'isSubscribed must be boolean' });
+      const db = getAdminFirestore();
+      await db.collection('users').doc(uid).set(
+        { isSubscribed, subscriptionSource: isSubscribed ? 'admin' : null, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('Admin toggle error:', e.message);
+      res.status(400).json({ error: e.message });
     }
   });
 

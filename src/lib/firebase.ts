@@ -144,3 +144,34 @@ export async function checkSubscriptionDb(userId: string): Promise<boolean> {
    }
    return false;
 }
+
+export async function syncWatchlistToDb(userId: string, watchlist: string[]) {
+  for (const symbol of watchlist) {
+    const ref = doc(db, 'users', userId, 'watchlist', symbol);
+    try {
+      await setDoc(ref, { symbol, addedAt: serverTimestamp() });
+    } catch {
+      // Silently ignore — item likely already exists (no update rule needed)
+    }
+  }
+}
+
+export async function loadWatchlistFromDb(userId: string): Promise<string[]> {
+  try {
+    const q = collection(db, 'users', userId, 'watchlist');
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.data().symbol as string);
+  } catch (err: any) {
+    handleFirestoreError(err, 'list', `/users/${userId}/watchlist`);
+    return [];
+  }
+}
+
+export async function deleteWatchlistItemDb(userId: string, symbol: string) {
+  const ref = doc(db, 'users', userId, 'watchlist', symbol);
+  try {
+    await deleteDoc(ref);
+  } catch (err: any) {
+    handleFirestoreError(err, 'delete', ref.path);
+  }
+}

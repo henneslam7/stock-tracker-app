@@ -1,4 +1,4 @@
-import { RefObject } from "react";
+import { RefObject, ReactNode } from "react";
 import { Search, Plus, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Stock } from "../types";
@@ -13,21 +13,23 @@ interface HeaderProps {
   onToggleWatchlist: (symbol: string) => void;
   onSelectFromSearch: (symbol: string, name: string) => void;
   searchInputRef: RefObject<HTMLInputElement>;
+  userMenu?: ReactNode;
 }
 
 export function Header({
   marketStatus, searchQuery, onSearchChange,
-  searchResults, prices, watchlist, onToggleWatchlist, onSelectFromSearch, searchInputRef
+  searchResults, prices, watchlist, onToggleWatchlist, onSelectFromSearch, searchInputRef, userMenu
 }: HeaderProps) {
   return (
     <div className="flex-none space-y-3">
       {/* Title row */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white">Market Intel</h1>
-          <p className="text-slate-500 text-xs md:text-sm font-medium flex items-center gap-2">
-            Portfolio Tracking • <span className="text-emerald-400 font-bold">Analysis Active</span>
-            <span className="text-[9px] font-black text-slate-600 border border-slate-700/60 rounded px-1.5 py-0.5 tracking-widest">
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-3xl font-black tracking-tighter text-white">Market Intel</h1>
+          <p className="text-slate-500 text-[10px] md:text-sm font-medium flex items-center gap-1.5 flex-wrap">
+            <span className="whitespace-nowrap">Portfolio Tracking</span>
+            <span className="text-emerald-400 font-bold whitespace-nowrap hidden sm:inline">• Analysis Active</span>
+            <span className="text-[9px] font-black text-slate-600 border border-slate-700/60 rounded px-1.5 py-0.5 tracking-widest whitespace-nowrap">
               v{__APP_VERSION__}
             </span>
           </p>
@@ -105,9 +107,10 @@ export function Header({
               </div>
             )}
           </div>
+          {userMenu}
         </div>
 
-        {/* Tablet/mobile: compact market dots */}
+        {/* Tablet/mobile: compact market dots + user menu */}
         <div className="flex lg:hidden items-center gap-3">
           <div className="flex items-center gap-2">
             {[{ label: 'US', status: marketStatus.us }, { label: 'HK', status: marketStatus.hk }].map(({ label, status }) => (
@@ -117,6 +120,7 @@ export function Header({
               </div>
             ))}
           </div>
+          {userMenu}
         </div>
       </div>
 

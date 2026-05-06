@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X, BrainCircuit, RefreshCw, TrendingUp, TrendingDown, ChevronLeft,
-  ArrowUpRight, ChevronRight, DollarSign, Newspaper
+  ArrowUpRight, ChevronRight, DollarSign, Newspaper, Lock
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -66,17 +66,21 @@ interface StockDrawerProps {
   portfolioItem: PortfolioItem | undefined;
   aiAnalysis: AIAnalysis | null;
   isAnalyzing: boolean;
+  canAnalyze?: boolean;
   onClose: () => void;
   onAnalyze: () => void;
   onAddToPortfolio: (symbol: string, shares: number, buyPrice: number) => void;
   onSell: (symbol: string) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
+  onSubscribeRequired?: () => void;
   inline?: boolean;
 }
 
 export function StockDrawer({
   stock, portfolioItem, aiAnalysis, isAnalyzing,
+  canAnalyze = false,
   onClose, onAnalyze, onAddToPortfolio, onSell, showToast,
+  onSubscribeRequired,
   inline = false,
 }: StockDrawerProps) {
   const [historicalData, setHistoricalData] = useState<PricePoint[]>([]);
@@ -253,12 +257,21 @@ export function StockDrawer({
             <p className="text-slate-500 text-sm mb-8 max-w-sm font-medium leading-relaxed">
               Comprehensive analysis of technicals, fundamentals, and latest news using Gemini AI.
             </p>
-            <button onClick={onAnalyze} disabled={isAnalyzing}
-              className="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-black transition-all disabled:opacity-50 flex items-center gap-3 text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95"
-            >
-              {isAnalyzing ? <RefreshCw className="animate-spin" size={20} /> : <ArrowUpRight size={20} />}
-              {isAnalyzing ? "Processing Data..." : "Run AI Analysis"}
-            </button>
+            {canAnalyze ? (
+              <button onClick={onAnalyze} disabled={isAnalyzing}
+                className="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-black transition-all disabled:opacity-50 flex items-center gap-3 text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95"
+              >
+                {isAnalyzing ? <RefreshCw className="animate-spin" size={20} /> : <ArrowUpRight size={20} />}
+                {isAnalyzing ? "Processing Data..." : "Run AI Analysis"}
+              </button>
+            ) : (
+              <button onClick={onSubscribeRequired}
+                className="bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/10 px-10 py-4 rounded-2xl font-black transition-all flex items-center gap-3 text-slate-400 hover:text-white"
+              >
+                <Lock size={20} />
+                Subscribe to Unlock
+              </button>
+            )}
           </motion.div>
         ) : (
           <motion.div key="report" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8">

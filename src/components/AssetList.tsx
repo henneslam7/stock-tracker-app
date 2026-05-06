@@ -36,54 +36,59 @@ function RecCard({
     <div
       onClick={() => onSelect(rec.symbol, rec.name)}
       className={cn(
-        "p-5 rounded-[1.5rem] flex items-center justify-between cursor-pointer group transition-all",
+        "p-4 rounded-[1.5rem] flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer group transition-all",
         isContrarian
           ? "bg-amber-500/[0.04] border border-amber-500/20 hover:bg-amber-500/[0.08]"
           : "bg-white/[0.03] border border-white/[0.05] table-row-hover"
       )}
     >
-      <div className="flex items-center gap-4">
+      {/* Symbol + name */}
+      <div className="flex items-center gap-3 shrink-0">
         <div className={cn(
-          "w-12 h-12 rounded-xl border flex items-center justify-center font-black text-[10px]",
+          "w-10 h-10 rounded-xl border flex items-center justify-center font-black text-[10px] shrink-0",
           isContrarian
             ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
             : "bg-black border-white/10 text-white"
         )}>
           {rec.symbol.substring(0, 4)}
         </div>
-        <div>
-          <div className="font-bold text-white text-sm tracking-tight flex items-center gap-2">
-            {rec.symbol}
+        <div className="min-w-0">
+          <div className="font-bold text-white text-sm tracking-tight flex items-center gap-2 flex-wrap">
+            <span className="shrink-0">{rec.symbol}</span>
             {isContrarian && (
-              <span className="text-[8px] font-black uppercase tracking-widest text-amber-500 border border-amber-500/40 rounded px-1.5 py-0.5">
+              <span className="text-[8px] font-black uppercase tracking-widest text-amber-500 border border-amber-500/40 rounded px-1.5 py-0.5 shrink-0">
                 Contrarian
               </span>
             )}
           </div>
-          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{rec.name}</div>
+          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate max-w-[140px]">{rec.name}</div>
         </div>
       </div>
-      <div className="flex-1 px-8">
-        <div className={cn("text-xs italic line-clamp-2", isContrarian ? "text-amber-200/60" : "text-slate-400")}>
+
+      {/* Reason + technicals */}
+      <div className="flex-1 min-w-0 sm:px-3">
+        <div className={cn("text-xs italic line-clamp-2 break-words", isContrarian ? "text-amber-200/60" : "text-slate-400")}>
           "{rec.reason}"
         </div>
         {rec.technicals && (
-          <div className="mt-2 flex gap-3 text-[9px] font-mono">
-            <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">RSI: <span className="text-white">{rec.technicals.rsi}</span></span>
-            <span className="bg-white/5 py-1 px-2 rounded-lg text-slate-400 border border-white/5">MACD: <span className="text-white">{rec.technicals.macd}</span></span>
+          <div className="mt-1.5 flex gap-2 text-[9px] font-mono flex-wrap">
+            <span className="bg-white/5 py-0.5 px-2 rounded-lg text-slate-400 border border-white/5 whitespace-nowrap">RSI: <span className="text-white">{rec.technicals.rsi}</span></span>
+            <span className="bg-white/5 py-0.5 px-2 rounded-lg text-slate-400 border border-white/5 whitespace-nowrap">MACD: <span className="text-white">{rec.technicals.macd}</span></span>
           </div>
         )}
       </div>
-      <div className="flex gap-4 items-center">
+
+      {/* Indicator + watchlist */}
+      <div className="flex gap-3 items-center shrink-0 self-end sm:self-auto">
         <span className={cn(
-          "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border",
+          "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border whitespace-nowrap",
           rec.indicator === 'High' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10' :
           rec.indicator === 'Low'  ? 'text-rose-400 border-rose-400/20 bg-rose-400/10' :
           'text-slate-400 border-slate-400/20 bg-slate-400/10'
         )}>{rec.indicator}</span>
         <button
           onClick={e => { e.stopPropagation(); onToggleWatchlist(rec.symbol); }}
-          className="text-accent hover:text-white p-2"
+          className="text-accent hover:text-white p-2 shrink-0"
         >
           {watchlist.includes(rec.symbol) ? <X size={18} /> : <Plus size={18} />}
         </button>
