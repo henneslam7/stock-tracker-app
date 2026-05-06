@@ -17,7 +17,18 @@ function ensureAdminApp() {
   if (getApps().length) return;
   const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!svcJson) throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON not set');
-  initAdminApp({ credential: cert(JSON.parse(svcJson)) });
+  let parsed: any;
+  try {
+    parsed = JSON.parse(svcJson);
+  } catch {
+    // Render may base64-encode the value — try decoding first
+    try {
+      parsed = JSON.parse(Buffer.from(svcJson, 'base64').toString('utf8'));
+    } catch {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON');
+    }
+  }
+  initAdminApp({ credential: cert(parsed) });
 }
 
 function getAdminFirestore() {
