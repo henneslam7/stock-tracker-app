@@ -1,7 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import Stripe from 'stripe';
@@ -45,8 +44,6 @@ function getStripe(): Stripe {
   if (!key) throw new Error('STRIPE_SECRET_KEY not set');
   return new Stripe(key);
 }
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Finnhub ──────────────────────────────────────────────────────────────────
 
