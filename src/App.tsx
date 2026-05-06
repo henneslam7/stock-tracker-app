@@ -379,7 +379,6 @@ export default function App() {
           <div className="bento-card p-5 flex flex-col gap-0 overflow-y-auto flex-1 min-h-0">
             <PortfolioBuilder
               user={user}
-              watchlist={watchlist}
               onLoginRequired={() => setShowAuthModal(true)}
               onSubscribeRequired={() => setShowSubscribe(true)}
             />

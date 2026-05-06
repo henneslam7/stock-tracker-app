@@ -6,8 +6,8 @@ import {
   ArrowUpRight, ChevronRight, DollarSign, Newspaper, Lock
 } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip as RechartsTooltip, ResponsiveContainer
+  AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from "recharts";
 import { cn } from "../lib/utils";
 import { Stock, PortfolioItem, AIAnalysis, PricePoint, ChartTimeframe } from "../types";
@@ -90,6 +90,35 @@ export function StockDrawer({
   const [manualPrice, setManualPrice] = useState(stock.price);
   const [chartLoading, setChartLoading] = useState(false);
 
+  // ── Moving averages ────────────────────────────────────────────────────────
+  function computeMA(data: PricePoint[], period: number): (number | null)[] {
+    return data.map((_, i) => {
+      if (i < period - 1) return null;
+      const slice = data.slice(i - period + 1, i + 1);
+      return slice.reduce((s, p) => s + p.price, 0) / period;
+    });
+  }
+
+  const MA_PERIODS = [5, 20, 30, 50];
+  const maData = MA_PERIODS.map(p => ({ period: p, values: computeMA(historicalData, p) }));
+
+  const chartData = historicalData.map((pt, i) => {
+    const row: any = { date: pt.date, price: pt.price };
+    maData.forEach(({ period, values }) => {
+      row[`ma${period}`] = values[i] != null ? parseFloat(values[i]!.toFixed(2)) : undefined;
+    });
+    return row;
+  });
+
+  // Current MA values (last non-null)
+  const currentMAs = MA_PERIODS.map(period => {
+    const vals = maData.find(m => m.period === period)?.values ?? [];
+    const last = [...vals].reverse().find(v => v !== null);
+    return { period, value: last ?? null };
+  }).filter(m => m.value !== null);
+
+  const MA_COLORS: Record<number, string> = { 5: '#f59e0b', 20: '#8b5cf6', 30: '#ec4899', 50: '#06b6d4' };
+
   const gain    = portfolioItem ? (stock.price - portfolioItem.averagePrice) * portfolioItem.shares : 0;
   const gainPct = portfolioItem && portfolioItem.averagePrice > 0
     ? ((stock.price - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100
@@ -128,7 +157,7 @@ export function StockDrawer({
   // ── Reusable sections ──────────────────────────────────────────────────────
 
   const ChartSection = (
-    <section className="bento-card p-6 overflow-hidden border-none bg-black/40 flex flex-col" style={{ height: '18rem' }}>
+    <section className="bento-card p-6 overflow-hidden border-none bg-black/40 flex flex-col" style={{ minHeight: '18rem' }}>
       <div className="flex items-center justify-between mb-4">
         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Historical Trend</span>
         <div className="flex gap-1">
@@ -156,7 +185,7 @@ export function StockDrawer({
           </div>
         )}
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={historicalData}>
+          <AreaChart data={chartData}>
             <defs>
               <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.3} />
@@ -172,29 +201,75 @@ export function StockDrawer({
             <RechartsTooltip
               contentStyle={{ borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: '#121418', padding: '12px' }}
               labelStyle={{ fontWeight: 800, marginBottom: '4px', fontSize: '10px', color: '#64748b' }}
-              itemStyle={{ fontWeight: 900, fontSize: '14px', color: '#fff' }}
-              formatter={(val: number) => [`$${val.toFixed(2)}`, 'Price']}
+              itemStyle={{ fontWeight: 700, fontSize: '11px' }}
+              formatter={(val: number, name: string) => {
+                const label = name === 'price' ? 'Price' : name.toUpperCase();
+                return [`$${Number(val).toFixed(2)}`, label];
+              }}
             />
             <Area type="monotone" dataKey="price" stroke="#2563eb" strokeWidth={3}
-              fillOpacity={1} fill="url(#colorPrice)" animationDuration={800}
+              fillOpacity={1} fill="url(#colorPrice)" animationDuration={800} dot={false}
             />
+            {currentMAs.map(({ period }) => (
+              <Line key={period} type="monotone" dataKey={`ma${period}`}
+                stroke={MA_COLORS[period]} strokeWidth={1.5} dot={false}
+                connectNulls animationDuration={600}
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
+        {/* MA legend */}
+        {currentMAs.length > 0 && (
+          <div className="flex flex-wrap gap-3 mt-2 px-1">
+            {currentMAs.map(({ period, value }) => (
+              <div key={period} className="flex items-center gap-1.5">
+                <div className="w-5 h-0.5 rounded-full" style={{ backgroundColor: MA_COLORS[period] }} />
+                <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: MA_COLORS[period] }}>
+                  MA{period}
+                </span>
+                <span className="text-[9px] font-bold text-slate-500">${value!.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
 
   const StatsSection = (
-    <div className="grid grid-cols-2 gap-3">
-      {STATS.map(({ label, value, color, span }) => (
-        <div key={label} className={cn("bento-card bg-white/[0.02] p-4 flex flex-col border-white/5", span === 2 ? "col-span-2" : "")}>
-          <div className="flex items-center mb-2">
-            <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest leading-none">{label}</span>
-            <Hint text={STAT_HINTS[label] ?? ''} />
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        {STATS.map(({ label, value, color, span }) => (
+          <div key={label} className={cn("bento-card bg-white/[0.02] p-4 flex flex-col border-white/5", span === 2 ? "col-span-2" : "")}>
+            <div className="flex items-center mb-2">
+              <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest leading-none">{label}</span>
+              <Hint text={STAT_HINTS[label] ?? ''} />
+            </div>
+            <span className={cn("font-mono text-sm font-black", color || "text-white")}>{value}</span>
           </div>
-          <span className={cn("font-mono text-sm font-black", color || "text-white")}>{value}</span>
+        ))}
+      </div>
+      {/* Moving averages */}
+      {currentMAs.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          {currentMAs.map(({ period, value }) => {
+            const above = value !== null && stock.price > value;
+            return (
+              <div key={period} className="bento-card bg-white/[0.02] p-4 flex flex-col border-white/5">
+                <div className="flex items-center gap-1 mb-2">
+                  <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: MA_COLORS[period] }} />
+                  <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest leading-none">MA {period}D</span>
+                  <Hint text={`${period}-day moving average. Price above MA = bullish. Price below = bearish.`} />
+                </div>
+                <span className="font-mono text-sm font-black text-white">${value!.toFixed(2)}</span>
+                <span className={cn("text-[9px] font-black mt-1", above ? "text-emerald-400" : "text-rose-400")}>
+                  {above ? "▲ Price above" : "▼ Price below"}
+                </span>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      )}
     </div>
   );
 

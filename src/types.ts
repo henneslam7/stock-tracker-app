@@ -58,19 +58,25 @@ export interface AIAnalysis {
   };
 }
 
-export interface PortfolioAllocation {
+export interface BuilderStock {
   symbol: string;
   name: string;
   market: 'US' | 'HK' | 'ETF';
   percentage: number;
   reason: string;
+  buyPrice: number;
+  sellPrice: number;
+  expectedGainPercent: number;
 }
 
-export interface PortfolioPlan {
+export interface BuilderPlan {
+  profile: 'Aggressive' | 'Safety' | 'Mix';
   summary: string;
-  riskProfile: 'Conservative' | 'Moderate' | 'Aggressive';
-  allocations: PortfolioAllocation[];
-  cashReservePercent: number;
+  allocations: BuilderStock[];
+}
+
+export interface PortfolioPlanSet {
+  plans: BuilderPlan[];
 }
 
 export interface Recommendation {

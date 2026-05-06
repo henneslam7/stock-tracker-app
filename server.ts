@@ -528,42 +528,49 @@ Schema (30 objects total):
       if (!userData.isSubscribed && !userData.isAdmin) {
         return res.status(403).json({ error: 'Subscription required' });
       }
-      const { amount, currency, preferredStocks = [] } = req.body as {
+      const { amount, currency, market } = req.body as {
         amount: number;
         currency: 'USD' | 'HKD';
-        preferredStocks: string[];
+        market: 'US' | 'HK' | 'Mixed';
       };
       if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-      const market = currency === 'HKD' ? 'Hong Kong (HKEX)' : 'US (NYSE/NASDAQ)';
-      const preferredNote = preferredStocks.length
-        ? `User prefers these stocks (include as many as suitable): ${preferredStocks.join(', ')}.`
-        : `No preferences — pick the best ${currency === 'HKD' ? 'HK' : 'US'} stocks for this budget.`;
-      const prompt = `You are an expert portfolio manager. Build an investment portfolio for a client.
+      const marketDesc =
+        market === 'US'    ? 'US stocks (NYSE/NASDAQ only)' :
+        market === 'HK'    ? 'HK stocks (HKEX only, use .HK suffix for symbols)' :
+                             'mixed US stocks (NYSE/NASDAQ) and HK stocks (HKEX, .HK suffix)';
+      const prompt = `You are an expert portfolio manager. Generate 3 investment portfolio plans for a client.
 
 Budget: ${currency} ${amount.toLocaleString()}
-Primary market: ${market}
-${preferredNote}
+Preferred market: ${marketDesc}
 
-Rules:
-- Allocate 5 to 8 positions (leave 5-15% as cash reserve)
-- If preferred stocks given, include them if appropriate; skip any that are too risky for the budget
-- Mix sectors for diversification
-- All "reason" fields must be in Traditional Chinese (Cantonese style), 1-2 sentences max
+Requirements:
+- Generate exactly 3 plans: Aggressive, Safety, Mix
+- Each plan must have exactly 5 stock positions (no cash reserve — allocate 100% across 5 stocks)
+- All "reason" fields must be in Traditional Chinese (Cantonese style), 1-2 sentences
+- buyPrice and sellPrice must be realistic numbers based on typical price ranges for the stock (approximate, not real-time)
+- expectedGainPercent: realistic expected % gain for the profile (Aggressive 30-80%, Safety 8-20%, Mix 15-35%)
+- Percentages in each plan must sum to exactly 100
 - Output ONLY a raw JSON object, no markdown, no code fences
 
 Schema:
 {
-  "summary": string (Traditional Chinese, 2-3 sentences, overall strategy),
-  "riskProfile": "Conservative" | "Moderate" | "Aggressive",
-  "cashReservePercent": number (5-15),
-  "allocations": [
+  "plans": [
     {
-      "symbol": string,
-      "name": string,
-      "market": "US" | "HK" | "ETF",
-      "percentage": number,
-      "reason": string (Traditional Chinese)
+      "profile": "Aggressive" | "Safety" | "Mix",
+      "summary": string (Traditional Chinese, 2 sentences describing this plan's strategy),
+      "allocations": [
+        {
+          "symbol": string,
+          "name": string,
+          "market": "US" | "HK" | "ETF",
+          "percentage": number,
+          "reason": string (Traditional Chinese),
+          "buyPrice": number,
+          "sellPrice": number,
+          "expectedGainPercent": number
+        }
+      ]
     }
   ]
 }`;
@@ -572,9 +579,9 @@ Schema:
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
-      let plan: any = {};
-      try { plan = JSON.parse(response.text || '{}'); } catch { plan = {}; }
-      res.json(plan);
+      let result: any = { plans: [] };
+      try { result = JSON.parse(response.text || '{}'); } catch { result = { plans: [] }; }
+      res.json(result);
     } catch (e: any) {
       console.error('Portfolio builder error:', e.message);
       res.status(400).json({ error: e.message });
