@@ -69,8 +69,27 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('subscribed') === '1') {
       window.history.replaceState({}, '', window.location.pathname);
-      refreshUser();
-      showToast('Subscription activated! AI Analysis unlocked.');
+      showToast('Payment received! Activating your subscription…');
+      // Webhook may take a few seconds — poll until isSubscribed flips true
+      let attempts = 0;
+      const poll = async () => {
+        await refreshUser();
+        attempts++;
+        // Re-read latest user state via a fresh Firestore fetch
+        const { getDocFromServer, doc } = await import('firebase/firestore');
+        const { auth, db } = await import('./lib/firebase');
+        if (!auth.currentUser) return;
+        const snap = await getDocFromServer(doc(db, 'users', auth.currentUser.uid));
+        if (snap.exists() && snap.data().isSubscribed) {
+          showToast('Subscription activated! AI Analysis unlocked. 🎉');
+          await refreshUser();
+        } else if (attempts < 6) {
+          setTimeout(poll, 3000);
+        } else {
+          showToast('Subscription saved — please refresh if AI is still locked.', 'error');
+        }
+      };
+      setTimeout(poll, 2000);
     } else if (params.get('subscribed') === '0') {
       window.history.replaceState({}, '', window.location.pathname);
     }
