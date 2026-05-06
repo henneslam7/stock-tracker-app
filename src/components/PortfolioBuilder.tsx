@@ -11,7 +11,7 @@ interface PortfolioBuilderProps {
   onSubscribeRequired: () => void;
 }
 
-type MarketOption = 'US' | 'HK' | 'Mixed';
+type MarketOption = 'US' | 'HK' | 'ETF' | 'Mixed';
 
 const PROFILE_CONFIG = {
   Aggressive: { color: 'text-rose-400',    border: 'border-rose-400/30',    bg: 'bg-rose-400/10',    active: 'bg-rose-500/20 border-rose-500/50 text-rose-300',    icon: TrendingUp, bar: 'bg-rose-500' },
@@ -20,9 +20,10 @@ const PROFILE_CONFIG = {
 };
 
 const MARKET_OPTIONS: { value: MarketOption; label: string; sub: string }[] = [
-  { value: 'US',    label: 'US',     sub: 'NYSE / NASDAQ' },
-  { value: 'HK',    label: 'HK',     sub: 'HKEX' },
-  { value: 'Mixed', label: 'Mixed',  sub: 'US + HK' },
+  { value: 'US',    label: 'US',    sub: 'NYSE / NASDAQ' },
+  { value: 'HK',    label: 'HK',    sub: 'HKEX' },
+  { value: 'ETF',   label: 'ETF',   sub: 'US-listed ETFs' },
+  { value: 'Mixed', label: 'Mixed', sub: 'US + HK' },
 ];
 
 function StockRow({ stock, currency, budget }: { stock: BuilderStock; currency: string; budget: number }) {

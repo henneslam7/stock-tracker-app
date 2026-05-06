@@ -531,13 +531,14 @@ Schema (30 objects total):
       const { amount, currency, market } = req.body as {
         amount: number;
         currency: 'USD' | 'HKD';
-        market: 'US' | 'HK' | 'Mixed';
+        market: 'US' | 'HK' | 'ETF' | 'Mixed';
       };
       if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
       const marketDesc =
         market === 'US'    ? 'US stocks (NYSE/NASDAQ only)' :
         market === 'HK'    ? 'HK stocks (HKEX only, use .HK suffix for symbols)' :
+        market === 'ETF'   ? 'US-listed ETFs only (e.g. SPY, QQQ, VTI, ARKK, GLD, TLT — no individual stocks)' :
                              'mixed US stocks (NYSE/NASDAQ) and HK stocks (HKEX, .HK suffix)';
       const prompt = `You are an expert portfolio manager. Generate 3 investment portfolio plans for a client.
 
