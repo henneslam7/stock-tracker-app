@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Wand2, Lock, DollarSign, Loader2, TrendingUp, Shield, Layers, AlertTriangle, ArrowUp, ArrowDown } from "lucide-react";
+import { Wand2, Lock, DollarSign, Loader2, TrendingUp, Shield, Layers, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
 import { auth } from "../lib/firebase";
 import { AuthUser } from "../hooks/useAuth";
 import { BuilderPlan, BuilderStock, PortfolioPlanSet } from "../types";
@@ -27,10 +27,9 @@ const MARKET_OPTIONS: { value: MarketOption; label: string; sub: string }[] = [
 ];
 
 function StockRow({ stock, currency, budget }: { stock: BuilderStock; currency: string; budget: number }) {
-  const allocated = (stock.percentage / 100) * budget;
-  const shares    = stock.buyPrice > 0 ? Math.floor(allocated / stock.buyPrice) : 0;
+  const allocated  = (stock.percentage / 100) * budget;
+  const shares     = stock.buyPrice > 0 ? Math.floor(allocated / stock.buyPrice) : 0;
   const actualCost = shares * stock.buyPrice;
-  const canAfford  = shares >= 1;
   const gainColor  = stock.expectedGainPercent >= 0 ? 'text-emerald-400' : 'text-rose-400';
   return (
     <div className="bg-white/[0.03] rounded-2xl p-3 space-y-2">
@@ -51,23 +50,14 @@ function StockRow({ stock, currency, budget }: { stock: BuilderStock; currency: 
         </div>
       </div>
 
-      {/* Shares affordability */}
-      {canAfford ? (
-        <div className="flex items-center justify-between bg-white/[0.03] rounded-xl px-3 py-1.5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Shares to buy</span>
-          <div className="flex items-center gap-2">
-            <span className="font-black text-white text-xs">{shares} shares</span>
-            <span className="text-[9px] text-slate-500 font-bold">≈ {currency} {actualCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-          </div>
+      {/* Shares to buy */}
+      <div className="flex items-center justify-between bg-white/[0.03] rounded-xl px-3 py-1.5">
+        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Shares to buy</span>
+        <div className="flex items-center gap-2">
+          <span className="font-black text-white text-xs">{shares} shares</span>
+          <span className="text-[9px] text-slate-500 font-bold">≈ {currency} {actualCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         </div>
-      ) : (
-        <div className="flex items-center gap-2 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-1.5">
-          <AlertTriangle size={10} className="text-amber-400 shrink-0" />
-          <span className="text-[9px] font-bold text-amber-400">
-            Budget too low — need {currency} {stock.buyPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })} for 1 share
-          </span>
-        </div>
-      )}
+      </div>
 
       {/* Progress bar */}
       <div className="h-0.5 bg-white/5 rounded-full overflow-hidden">

@@ -548,6 +548,7 @@ Preferred market: ${marketDesc}
 Requirements:
 - Generate exactly 3 plans: Aggressive, Safety, Mix
 - Each plan must have exactly 5 stock positions (no cash reserve — allocate 100% across 5 stocks)
+- CRITICAL: For each position, the buyPrice MUST be less than (percentage/100 × budget). The user must be able to afford at least 1 share with the allocated amount. If a stock is too expensive for its allocation, pick a cheaper alternative in the same sector.
 - All "reason" fields must be in Traditional Chinese (Cantonese style), 1-2 sentences
 - buyPrice and sellPrice must be realistic numbers based on typical price ranges for the stock (approximate, not real-time)
 - expectedGainPercent: realistic expected % gain for the profile (Aggressive 30-80%, Safety 8-20%, Mix 15-35%)
