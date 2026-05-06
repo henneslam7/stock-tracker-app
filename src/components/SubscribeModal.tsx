@@ -85,7 +85,7 @@ export function SubscribeModal({ isOpen, onClose, onLoginRequired, isLoggedIn }:
               {/* Price + CTA */}
               <div className="px-8 pb-8 space-y-3">
                 <div className="text-center mb-4">
-                  <span className="text-4xl font-black text-white">$9</span>
+                  <span className="text-4xl font-black text-white">HK$50</span>
                   <span className="text-slate-500 font-bold">/month</span>
                   <div className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-1">Cancel anytime</div>
                 </div>
