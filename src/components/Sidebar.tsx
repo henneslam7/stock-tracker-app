@@ -1,4 +1,7 @@
-import { Activity, PieChart as PieChartIcon, List, Compass, Search, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "motion/react";
+import { Activity, PieChart as PieChartIcon, List, Compass, Search, RefreshCw, Menu, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ActiveTab } from "../types";
 
@@ -11,61 +14,174 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearchFocus, onRefresh }: SidebarProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const navItems = [
     { tab: 'portfolio' as ActiveTab, icon: PieChartIcon, title: 'Portfolio' },
     { tab: 'watchlist' as ActiveTab, icon: List, title: 'Watchlist' },
   ];
 
-  return (
-    <nav className="hidden md:flex flex-col items-center py-6 space-y-8 w-20 bg-surface border border-line rounded-[2.5rem]">
-      <div className="w-12 h-12 bg-accent rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-accent/20">
-        <Activity size={24} />
-      </div>
+  const closeMenu = () => setMenuOpen(false);
 
-      <div className="flex flex-col gap-8 text-slate-500">
+  const handleDiscover = () => { onLoadRecommendations(); closeMenu(); };
+  const handleSearch   = () => { onSearchFocus(); closeMenu(); };
+  const handleRefresh  = () => { onRefresh(); closeMenu(); };
+  const handleTab      = (tab: ActiveTab) => { onTabChange(tab); closeMenu(); };
+
+  return (
+    <>
+      {/* Desktop left sidebar */}
+      <nav className="hidden md:flex flex-col items-center py-6 space-y-8 w-20 bg-surface border border-line rounded-[2.5rem]">
+        <div className="w-12 h-12 bg-accent rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-accent/20">
+          <Activity size={24} />
+        </div>
+
+        <div className="flex flex-col gap-8 text-slate-500">
+          {navItems.map(({ tab, icon: Icon, title }) => (
+            <button
+              key={tab}
+              onClick={() => onTabChange(tab)}
+              title={title}
+              className={cn(
+                "p-3 rounded-2xl transition-all duration-300",
+                activeTab === tab ? "bg-white/10 text-white shadow-xl shadow-white/5" : "hover:text-white"
+              )}
+            >
+              <Icon size={24} />
+            </button>
+          ))}
+
+          <button
+            onClick={onLoadRecommendations}
+            title="Discover AI Picks"
+            className={cn(
+              "p-3 rounded-2xl transition-all duration-300",
+              activeTab === "discover" ? "bg-white/10 text-white shadow-xl shadow-white/5" : "hover:text-white"
+            )}
+          >
+            <Compass size={24} />
+          </button>
+
+          <button
+            className="p-3 text-slate-500 hover:text-white transition-colors"
+            onClick={onSearchFocus}
+            title="Search"
+          >
+            <Search size={24} />
+          </button>
+        </div>
+
+        <div className="mt-auto">
+          <button
+            onClick={onRefresh}
+            className="p-3 text-slate-500 hover:text-white hover:rotate-180 transition-all duration-500"
+            title="Refresh"
+          >
+            <RefreshCw size={24} />
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-surface/95 backdrop-blur-xl border-t border-line flex items-center justify-around px-2 pb-safe">
         {navItems.map(({ tab, icon: Icon, title }) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
-            title={title}
             className={cn(
-              "p-3 rounded-2xl transition-all duration-300",
-              activeTab === tab ? "bg-white/10 text-white shadow-xl shadow-white/5" : "hover:text-white"
+              "flex flex-col items-center gap-1 py-3 px-4 rounded-2xl transition-all",
+              activeTab === tab ? "text-white" : "text-slate-600"
             )}
           >
-            <Icon size={24} />
+            <Icon size={22} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{title}</span>
           </button>
         ))}
-
         <button
           onClick={onLoadRecommendations}
-          title="Discover AI Picks"
           className={cn(
-            "p-3 rounded-2xl transition-all duration-300",
-            activeTab === "discover" ? "bg-white/10 text-white shadow-xl shadow-white/5" : "hover:text-white"
+            "flex flex-col items-center gap-1 py-3 px-4 rounded-2xl transition-all",
+            activeTab === "discover" ? "text-accent" : "text-slate-600"
           )}
         >
-          <Compass size={24} />
+          <Compass size={22} />
+          <span className="text-[9px] font-black uppercase tracking-widest">Discover</span>
         </button>
-
         <button
-          className="p-3 text-slate-500 hover:text-white transition-colors"
-          onClick={onSearchFocus}
-          title="Search"
+          onClick={() => setMenuOpen(true)}
+          className="flex flex-col items-center gap-1 py-3 px-4 text-slate-600 hover:text-white transition-colors"
         >
-          <Search size={24} />
+          <Menu size={22} />
+          <span className="text-[9px] font-black uppercase tracking-widest">More</span>
         </button>
-      </div>
+      </nav>
 
-      <div className="mt-auto">
-        <button
-          onClick={onRefresh}
-          className="p-3 text-slate-500 hover:text-white hover:rotate-180 transition-all duration-500"
-          title="Refresh"
-        >
-          <RefreshCw size={24} />
-        </button>
-      </div>
-    </nav>
+      {/* Mobile hamburger slide-up menu */}
+      {createPortal(
+        <AnimatePresence>
+          {menuOpen && (
+            <>
+              <motion.div
+                key="overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={closeMenu}
+                className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm md:hidden"
+              />
+              <motion.div
+                key="sheet"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="fixed bottom-0 left-0 right-0 z-[70] md:hidden bg-surface border-t border-line rounded-t-[2rem] p-6 pb-10"
+              >
+                {/* Handle bar */}
+                <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
+
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-accent rounded-xl flex items-center justify-center">
+                      <Activity size={16} className="text-white" />
+                    </div>
+                    <span className="text-white font-black tracking-tight">Market Intel</span>
+                  </div>
+                  <button onClick={closeMenu} className="p-2 text-slate-500 hover:text-white transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {[
+                    { icon: PieChartIcon, label: 'Portfolio',   action: () => handleTab('portfolio'),  active: activeTab === 'portfolio' },
+                    { icon: List,         label: 'Watchlist',   action: () => handleTab('watchlist'),  active: activeTab === 'watchlist' },
+                    { icon: Compass,      label: 'AI Discover', action: handleDiscover,                active: activeTab === 'discover' },
+                    { icon: Search,       label: 'Search',      action: handleSearch,                  active: false },
+                    { icon: RefreshCw,    label: 'Refresh Data',action: handleRefresh,                 active: false },
+                  ].map(({ icon: Icon, label, action, active }) => (
+                    <button
+                      key={label}
+                      onClick={action}
+                      className={cn(
+                        "w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all text-left",
+                        active
+                          ? "bg-white/10 text-white"
+                          : "text-slate-400 hover:bg-white/5 hover:text-white"
+                      )}
+                    >
+                      <Icon size={20} />
+                      <span className="font-black text-sm tracking-wide">{label}</span>
+                      {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-accent" />}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
   );
 }

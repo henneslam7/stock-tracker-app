@@ -12,13 +12,13 @@ export function PortfolioSummaryCard({ portfolioValue, portfolioGain }: Portfoli
     : 0;
 
   return (
-    <div className="col-span-12 md:col-span-4 row-span-2 bento-card p-6 flex flex-col justify-between">
+    <div className="md:col-span-4 md:row-span-2 bento-card p-5 md:p-6 flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
           <span className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">Portfolio Performance</span>
           <TrendingUp className="text-emerald-400" size={20} />
         </div>
-        <div className="text-5xl font-light tracking-tight text-white data-value">
+        <div className="text-3xl md:text-5xl font-light tracking-tight text-white data-value">
           ${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         <div className={cn(

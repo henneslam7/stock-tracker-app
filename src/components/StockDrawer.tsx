@@ -524,9 +524,9 @@ export function StockDrawer({
 
   if (inline) {
     return (
-      <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-4 md:gap-6 min-h-0 overflow-hidden">
         {/* Nav bar */}
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-3 md:gap-4 shrink-0">
           <button
             onClick={onClose}
             className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-white/20 px-3 py-2 rounded-xl"
@@ -534,13 +534,13 @@ export function StockDrawer({
             <ChevronLeft size={14} /> Back
           </button>
           <div className="h-4 w-[1px] bg-white/10" />
-          <div className="flex items-baseline gap-3 min-w-0 overflow-hidden">
-            <span className="text-white font-black text-xl shrink-0">{stock.symbol}</span>
+          <div className="flex items-baseline gap-2 md:gap-3 min-w-0 overflow-hidden">
+            <span className="text-white font-black text-lg md:text-xl shrink-0">{stock.symbol}</span>
             <span className="text-slate-500 text-sm font-medium truncate">{stock.name}</span>
             <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest shrink-0 hidden lg:block">{stock.sector}</span>
           </div>
           <div className="ml-auto text-right shrink-0">
-            <div className="text-xl font-black text-white">${stock.price.toFixed(2)}</div>
+            <div className="text-lg md:text-xl font-black text-white">${stock.price.toFixed(2)}</div>
             <div className={cn("text-xs font-black flex items-center justify-end gap-1", stock.change >= 0 ? "text-emerald-400" : "text-rose-400")}>
               {stock.change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
               {stock.change >= 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%
@@ -548,20 +548,20 @@ export function StockDrawer({
           </div>
         </div>
 
-        {/* 3-column body */}
-        <div className="flex-1 grid grid-cols-[1fr_1.1fr_0.75fr] gap-6 min-h-0 overflow-hidden">
-          {/* Left: Chart + Stats + News */}
-          <div className="overflow-y-auto space-y-6 custom-scrollbar pr-1">
+        {/* Body: single col on mobile, 3-col on desktop */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1.1fr_0.75fr] gap-4 md:gap-6 overflow-y-auto md:overflow-hidden custom-scrollbar">
+          {/* Left / top: Chart + Stats + News */}
+          <div className="space-y-4 md:space-y-6 md:overflow-y-auto md:custom-scrollbar md:pr-1">
             {ChartSection}
             {StatsSection}
             {NewsSection}
           </div>
           {/* Center: AI Analysis */}
-          <div className="overflow-y-auto custom-scrollbar pr-1">
+          <div className="md:overflow-y-auto md:custom-scrollbar md:pr-1">
             {AISection}
           </div>
-          {/* Right: Position + Trade */}
-          <div className="overflow-y-auto space-y-4 custom-scrollbar pr-1">
+          {/* Right / bottom: Position + Trade */}
+          <div className="space-y-4 md:overflow-y-auto md:custom-scrollbar md:pr-1">
             {PositionCard}
             {TradePanel}
           </div>

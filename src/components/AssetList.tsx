@@ -203,19 +203,27 @@ export function AssetList({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={() => onSelectStock(data)}
-              className="p-5 bg-white/[0.03] border border-white/[0.05] rounded-[1.5rem] flex items-center justify-between table-row-hover group cursor-pointer"
+              className="p-4 md:p-5 bg-white/[0.03] border border-white/[0.05] rounded-[1.5rem] flex items-center justify-between table-row-hover group cursor-pointer"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center font-black text-[10px] text-white">
+              <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0">
                   {item.symbol.substring(0, 3)}
                 </div>
-                <div>
-                  <div className="font-bold text-white text-sm tracking-tight">{data.name}</div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.symbol} • {data.sector}</div>
+                <div className="min-w-0">
+                  <div className="font-bold text-white text-sm tracking-tight truncate">{data.name}</div>
+                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.symbol}
+                    <span className="hidden sm:inline"> • {data.sector}</span>
+                  </div>
+                  {/* Mobile-only: gain shown inline under name */}
+                  {gain !== null && (
+                    <div className={cn("text-[10px] font-black sm:hidden", gain >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                      {gain >= 0 ? "+" : ""}${Math.abs(gain).toFixed(2)}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-8">
+              <div className="flex items-center gap-3 md:gap-8 shrink-0">
                 {portfolioItem && (
                   <div className="text-right hidden sm:block">
                     <div className="text-xs font-black text-white">{portfolioItem.shares} <span className="text-[10px] text-slate-500 uppercase">Shares</span></div>
@@ -230,14 +238,15 @@ export function AssetList({
                     <div className="text-[10px] text-slate-500 font-bold uppercase leading-none mt-1">Total Return</div>
                   </div>
                 )}
-                <div className="text-right w-24">
+                <div className="text-right w-20 md:w-24">
                   <div className="text-sm font-black text-white data-value">${data.price.toFixed(2)}</div>
                   <div className={cn("text-[10px] font-black uppercase tracking-tighter", data.change >= 0 ? "text-emerald-400" : "text-rose-400")}>
                     {data.change >= 0 ? "+" : ""}{data.changePercent.toFixed(2)}%
                   </div>
                 </div>
 
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                {/* Actions: always visible on mobile, hover-reveal on desktop */}
+                <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 md:translate-x-2 md:group-hover:translate-x-0 transition-all">
                   {activeTab === "portfolio" ? (
                     <>
                       <button
@@ -249,7 +258,7 @@ export function AssetList({
                       </button>
                       <button
                         onClick={async e => { e.stopPropagation(); await onRemoveFromPortfolio(item.symbol); }}
-                        className="p-2 text-rose-400 hover:bg-rose-400/10 rounded-xl"
+                        className="p-2 text-rose-400 hover:bg-rose-400/10 rounded-xl hidden sm:block"
                         title="Remove"
                       >
                         <Trash2 size={16} />

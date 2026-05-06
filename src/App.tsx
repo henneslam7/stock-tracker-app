@@ -222,7 +222,7 @@ export default function App() {
   const sellItem = sellSymbol ? portfolio.find(p => p.symbol === sellSymbol) : undefined;
 
   return (
-    <div className="flex h-screen bg-bg text-ink font-sans overflow-hidden p-6 gap-6">
+    <div className="flex h-screen bg-bg text-ink font-sans overflow-hidden p-3 md:p-6 gap-3 md:gap-6">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -231,7 +231,7 @@ export default function App() {
         onRefresh={() => window.location.reload()}
       />
 
-      <div className="flex-1 flex flex-col gap-6 overflow-hidden pr-2 pb-2 min-w-0">
+      <div className="flex-1 flex flex-col gap-3 md:gap-6 overflow-y-auto md:overflow-hidden pr-0 md:pr-2 pb-20 md:pb-2 min-w-0">
         <Header
           marketStatus={marketStatus}
           searchQuery={searchQuery}
@@ -258,10 +258,10 @@ export default function App() {
             showToast={showToast}
           />
         ) : (
-          <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-12 grid-rows-[repeat(5,minmax(130px,1fr))] gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 md:grid-rows-[repeat(5,minmax(130px,1fr))] md:overflow-hidden md:flex-1 gap-4 md:gap-6">
             <PortfolioSummaryCard portfolioValue={portfolioValue} portfolioGain={portfolioGain} />
 
-            <div className="col-span-12 md:col-span-8 row-span-5 bento-card p-4 overflow-hidden flex flex-col">
+            <div className="md:col-span-8 md:row-span-5 bento-card p-4 overflow-hidden flex flex-col min-h-[400px] md:min-h-0">
               <div className="flex items-center justify-between px-4 py-2 mb-2">
                 <h3 className="font-black text-white uppercase tracking-widest text-xs">
                   {activeTab === "portfolio" ? "Holdings" : activeTab === "watchlist" ? "Watchlist" : "AI Recommendations"}

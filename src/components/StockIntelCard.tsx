@@ -31,7 +31,7 @@ export function StockIntelCard({ portfolio, prices }: StockIntelCardProps) {
     .sort((a, b) => b.value - a.value);
 
   return (
-    <div className="col-span-12 md:col-span-4 row-span-3 bento-card p-6 flex flex-col overflow-hidden">
+    <div className="md:col-span-4 md:row-span-3 bento-card p-5 md:p-6 flex flex-col overflow-hidden max-h-72 md:max-h-none">
       <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-4 shrink-0">Portfolio Allocation</div>
 
       {portfolio.length === 0 ? (
