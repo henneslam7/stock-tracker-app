@@ -57,6 +57,7 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [sellSymbol, setSellSymbol] = useState<string | null>(null);
+  const [lifetimeGain, setLifetimeGain] = useLocalStorage<number>("stock_tracker_lifetime_gain", 0);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -261,10 +262,9 @@ export default function App() {
     showToast(`Added ${shares} ${symbol} @ $${buyPrice.toFixed(2)}`);
   };
 
-  const sellPortfolioItem = (symbol: string, sharesToSell: number) => {
+  const sellPortfolioItem = (symbol: string, sharesToSell: number, sellPrice: number) => {
     const item = portfolio.find(p => p.symbol === symbol);
     if (!item) return;
-    const currentPrice = prices[symbol]?.price ?? item.averagePrice;
     let updated: PortfolioItem[];
     if (sharesToSell >= item.shares) {
       updated = portfolio.filter(p => p.symbol !== symbol);
@@ -278,7 +278,8 @@ export default function App() {
       );
     }
     setPortfolio(updated);
-    const pnl = (currentPrice - item.averagePrice) * sharesToSell;
+    const pnl = (sellPrice - item.averagePrice) * sharesToSell;
+    setLifetimeGain(prev => prev + pnl);
     showToast(
       `Sold ${sharesToSell} ${symbol} • P&L: ${pnl >= 0 ? "+" : ""}$${Math.abs(pnl).toFixed(2)}`,
       pnl >= 0 ? "success" : "error"
@@ -400,7 +401,7 @@ export default function App() {
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-12 md:grid-rows-[repeat(5,minmax(130px,1fr))] md:overflow-hidden md:flex-1 gap-4 md:gap-6">
-            <PortfolioSummaryCard portfolioValue={portfolioValue} portfolioGain={portfolioGain} />
+            <PortfolioSummaryCard portfolioValue={portfolioValue} portfolioGain={portfolioGain} lifetimeGain={lifetimeGain} />
 
             <div className="md:col-span-8 md:row-span-5 bento-card p-4 overflow-hidden flex flex-col min-h-[400px] md:min-h-0">
               <div className="flex items-center justify-between px-4 py-2 mb-2">
@@ -435,8 +436,8 @@ export default function App() {
           currentPrice={prices[sellSymbol]?.price ?? sellItem.averagePrice}
           aiAnalysis={selectedStock?.symbol === sellSymbol ? aiAnalysis : null}
           onClose={() => setSellSymbol(null)}
-          onSell={shares => {
-            sellPortfolioItem(sellSymbol, shares);
+          onSell={(shares, sellPrice) => {
+            sellPortfolioItem(sellSymbol, shares, sellPrice);
             setSellSymbol(null);
           }}
         />

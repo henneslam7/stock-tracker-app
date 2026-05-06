@@ -11,31 +11,32 @@ interface SellModalProps {
   currentPrice: number;
   aiAnalysis: AIAnalysis | null;
   onClose: () => void;
-  onSell: (shares: number) => void;
+  onSell: (shares: number, sellPrice: number) => void;
 }
 
 export function SellModal({ symbol, portfolioItem, currentPrice, aiAnalysis, onClose, onSell }: SellModalProps) {
   const [sharesToSell, setSharesToSell] = useState(portfolioItem.shares);
+  const [sellPrice, setSellPrice]       = useState(currentPrice);
 
   const profitTarget = aiAnalysis?.sellingPrice ?? portfolioItem.averagePrice * 1.10;
   const cutLoss     = aiAnalysis?.cutLossPrice  ?? portfolioItem.averagePrice * 0.92;
 
-  const proceeds = sharesToSell * currentPrice;
+  const proceeds  = sharesToSell * sellPrice;
   const costBasis = sharesToSell * portfolioItem.averagePrice;
-  const pnl = proceeds - costBasis;
-  const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+  const pnl       = proceeds - costBasis;
+  const pnlPct    = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
 
-  const unrealizedTotal = (currentPrice - portfolioItem.averagePrice) * portfolioItem.shares;
+  const unrealizedTotal = (sellPrice - portfolioItem.averagePrice) * portfolioItem.shares;
   const unrealizedPct   = portfolioItem.averagePrice > 0
-    ? ((currentPrice - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100
+    ? ((sellPrice - portfolioItem.averagePrice) / portfolioItem.averagePrice) * 100
     : 0;
 
-  const priceAboveCutLoss  = currentPrice > cutLoss;
-  const priceAboveProfit   = currentPrice >= profitTarget;
+  const priceAboveCutLoss = sellPrice > cutLoss;
+  const priceAboveProfit  = sellPrice >= profitTarget;
 
   const handleSell = () => {
     if (sharesToSell <= 0 || sharesToSell > portfolioItem.shares) return;
-    onSell(sharesToSell);
+    onSell(sharesToSell, sellPrice);
   };
 
   return (
@@ -112,27 +113,49 @@ export function SellModal({ symbol, portfolioItem, currentPrice, aiAnalysis, onC
           )}
         </div>
 
-        {/* Shares input */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Shares to Sell</label>
+        {/* Sell price + shares inputs */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Sell Price</label>
+            <div className="flex items-center gap-2 bg-black/40 p-3 rounded-2xl border border-white/10">
+              <span className="text-slate-500 text-xs font-bold">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={sellPrice}
+                onChange={e => setSellPrice(parseFloat(e.target.value) || 0)}
+                className="bg-transparent w-full text-sm font-black text-white outline-none"
+              />
+            </div>
             <button
-              onClick={() => setSharesToSell(portfolioItem.shares)}
+              onClick={() => setSellPrice(currentPrice)}
               className="text-[9px] text-accent font-black uppercase tracking-widest hover:opacity-80"
             >
-              Sell All
+              Use market price
             </button>
           </div>
-          <div className="flex items-center gap-3 bg-black/40 p-3 rounded-2xl border border-white/10">
-            <input
-              type="number"
-              min={1}
-              max={portfolioItem.shares}
-              value={sharesToSell}
-              onChange={e => setSharesToSell(Math.min(portfolioItem.shares, Math.max(1, parseInt(e.target.value) || 0)))}
-              className="bg-transparent w-full text-sm font-black text-white outline-none"
-            />
-            <span className="text-slate-500 text-xs font-bold">/ {portfolioItem.shares}</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Shares</label>
+              <button
+                onClick={() => setSharesToSell(portfolioItem.shares)}
+                className="text-[9px] text-accent font-black uppercase tracking-widest hover:opacity-80"
+              >
+                All
+              </button>
+            </div>
+            <div className="flex items-center gap-3 bg-black/40 p-3 rounded-2xl border border-white/10">
+              <input
+                type="number"
+                min={1}
+                max={portfolioItem.shares}
+                value={sharesToSell}
+                onChange={e => setSharesToSell(Math.min(portfolioItem.shares, Math.max(1, parseInt(e.target.value) || 0)))}
+                className="bg-transparent w-full text-sm font-black text-white outline-none"
+              />
+              <span className="text-slate-500 text-xs font-bold">/ {portfolioItem.shares}</span>
+            </div>
           </div>
         </div>
 
