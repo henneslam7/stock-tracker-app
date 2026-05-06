@@ -473,8 +473,32 @@ Output JSON (strict schema, no extra keys):
     try {
       const ai = getGeminiClient();
 
-      const prompt = `
-You are a contrarian quant analyst. Provide exactly 10 recommendations for each of 3 markets (30 total):
+      // Fetch live market news from Finnhub for real-world context
+      let newsHeadlines = '';
+      try {
+        const [generalNews, cryptoNews, mergerNews] = await Promise.allSettled([
+          fhFetch('/news?category=general&minId=0'),
+          fhFetch('/news?category=technology&minId=0'),
+          fhFetch('/news?category=merger&minId=0'),
+        ]);
+        const allNews: any[] = [
+          ...(generalNews.status === 'fulfilled' ? generalNews.value : []),
+          ...(cryptoNews.status === 'fulfilled'  ? cryptoNews.value  : []),
+          ...(mergerNews.status === 'fulfilled'  ? mergerNews.value  : []),
+        ];
+        const headlines = allNews
+          .filter((n: any) => n?.headline)
+          .slice(0, 40)
+          .map((n: any) => `• ${n.headline}${n.related ? ` [${n.related}]` : ''}`)
+          .join('\n');
+        if (headlines) newsHeadlines = `\nCurrent market news (use these to inform your picks):\n${headlines}\n`;
+      } catch { /* proceed without news if fetch fails */ }
+
+      const today = new Date().toISOString().split('T')[0];
+
+      const prompt = `You are a sharp quant analyst. Today is ${today}. Based on current market conditions and the latest news below, pick 30 stocks/ETFs with genuine near-term catalysts.
+${newsHeadlines}
+Provide exactly 10 recommendations for each of 3 markets (30 total):
 
 Markets:
 1. US equities
@@ -482,14 +506,14 @@ Markets:
 3. Global ETFs (e.g. SPY, QQQ, ARKK, SOXS)
 
 For each market, split into two tiers:
-- "standard" (5 picks): conventional, high-quality, well-known names with solid fundamentals and clear catalysts. Safe mainstream consensus.
-- "contrarian" (5 picks): deeply unconventional, against current market consensus. Pick from: beaten-down fallen angels, heavily shorted squeeze candidates, overlooked micro/small-caps, sector outliers, inverse/leveraged plays, or names with controversial thesis. Must genuinely surprise a seasoned trader. Do NOT pick obvious large-caps for this tier.
+- "standard" (5 picks): high-quality names with solid fundamentals and a clear news-driven or trend catalyst right now.
+- "contrarian" (5 picks): against current consensus — beaten-down names, squeeze candidates, overlooked plays, or inverse/leveraged ideas with a specific contrarian thesis tied to current events.
 
 Rules:
-- All 'reason' fields in Cantonese (Traditional Chinese)
+- Each "reason" must reference a specific current trend, news catalyst, or market condition (not generic statements)
+- All "reason" fields in Cantonese (Traditional Chinese)
 - Output ONLY a raw JSON array, zero markdown, zero code fences
-- Vary the picks — no duplicates across tiers or markets
-- Contrarian picks should have diverse, creative rationale
+- No duplicates across tiers or markets
 
 Schema (30 objects total):
 [{
@@ -497,7 +521,7 @@ Schema (30 objects total):
   "name": string,
   "market": "US"|"HK"|"ETF",
   "tier": "standard"|"contrarian",
-  "reason": string (Cantonese, 1-2 sentences explaining the thesis),
+  "reason": string (Cantonese, 1-2 sentences with specific catalyst),
   "indicator": "High"|"Mild"|"Low",
   "technicals": { "rsi": string, "macd": string }
 }]`;
