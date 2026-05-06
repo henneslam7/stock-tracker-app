@@ -39,7 +39,7 @@ export function UserMenu({ user, loading, onAdminPortal }: UserMenuProps) {
       });
       if (!res.ok) throw new Error(await res.text());
       const { url } = await res.json();
-      window.location.href = url;
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch {
       alert('Could not open billing portal. Please try again.');
     } finally {

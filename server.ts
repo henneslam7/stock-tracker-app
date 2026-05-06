@@ -534,6 +534,7 @@ Schema (30 objects total):
         cancel_url:  `${appUrl}?subscribed=0`,
         customer_email: decoded.email || undefined,
         metadata: { userId: decoded.uid },
+        subscription_data: { metadata: { userId: decoded.uid } },
       });
       res.json({ url: session.url });
     } catch (e: any) {
@@ -630,17 +631,20 @@ Schema (30 objects total):
         } catch (e: any) { console.error('Firestore update error:', e.message); }
       }
     }
-    if (event.type === 'customer.subscription.deleted') {
+    if (event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.updated') {
       const sub = event.data.object as Stripe.Subscription;
       const userId = (sub.metadata as any)?.userId;
-      if (userId) {
+      // Revoke access when subscription ends or is cancelled (status: canceled/unpaid/past_due)
+      const inactive = ['canceled', 'unpaid', 'past_due'].includes(sub.status);
+      if (userId && (event.type === 'customer.subscription.deleted' || inactive)) {
         try {
           const db = getAdminFirestore();
           await db.collection('users').doc(userId).set(
             { isSubscribed: false, updatedAt: FieldValue.serverTimestamp() },
             { merge: true }
           );
-        } catch (e: any) { console.error('Firestore update error:', e.message); }
+          console.log(`Subscription revoked for uid=${userId} status=${sub.status}`);
+        } catch (e: any) { console.error('Firestore revoke error:', e.message); }
       }
     }
     res.json({ received: true });
