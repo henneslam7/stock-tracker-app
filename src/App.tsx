@@ -85,14 +85,14 @@ export default function App() {
             const data = await res.json();
             console.log('[stripe] verify-session response:', data);
             if (data.subscribed) {
-              if (data.firestoreError) {
-                // Server confirmed payment but Firestore write failed — write from client as fallback
-                const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
-                await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-                  isSubscribed: true,
-                  updatedAt: serverTimestamp(),
-                });
-              }
+              // Server confirmed payment — also write from client to guarantee Firestore is updated
+              // even if server-side Admin SDK write failed for any reason
+              const { doc: fsDoc, setDoc: fsSet, serverTimestamp: fsST } = await import('firebase/firestore');
+              await fsSet(
+                fsDoc(db, 'users', auth.currentUser.uid),
+                { isSubscribed: true, updatedAt: fsST() },
+                { merge: true }
+              );
               await refreshUser();
               showToast('Subscription activated! AI Analysis unlocked.');
               return;

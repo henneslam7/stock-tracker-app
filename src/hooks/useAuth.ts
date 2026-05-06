@@ -24,7 +24,8 @@ async function fetchUserData(firebaseUser: User): Promise<AuthUser> {
       isSubscribed: data.isSubscribed ?? false,
       isAdmin: data.isAdmin ?? false,
     };
-  } catch {
+  } catch (e) {
+    console.error('[useAuth] fetchUserData failed:', e);
     return {
       uid: firebaseUser.uid,
       email: firebaseUser.email || '',
