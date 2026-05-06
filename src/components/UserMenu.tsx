@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { LogIn, LogOut, User, Shield, ChevronDown } from "lucide-react";
+import { LogIn, LogOut, User, Shield, ChevronDown, Receipt } from "lucide-react";
 import { auth, loginWithGoogle, logout } from "../lib/firebase";
 import { AuthUser } from "../hooks/useAuth";
 import { cn } from "../lib/utils";
@@ -15,6 +15,7 @@ interface UserMenuProps {
 export function UserMenu({ user, loading, onAdminPortal }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoggingIn(true);
@@ -25,6 +26,25 @@ export function UserMenu({ user, loading, onAdminPortal }: UserMenuProps) {
   const handleLogout = async () => {
     setOpen(false);
     await logout();
+  };
+
+  const handleBilling = async () => {
+    if (!auth.currentUser) return;
+    setBillingLoading(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/stripe/customer-portal', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch {
+      alert('Could not open billing portal. Please try again.');
+    } finally {
+      setBillingLoading(false);
+    }
   };
 
   if (loading) return <div className="w-9 h-9 bg-white/5 rounded-xl animate-pulse" />;
@@ -95,6 +115,15 @@ export function UserMenu({ user, loading, onAdminPortal }: UserMenuProps) {
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-amber-400 hover:bg-amber-400/10 transition-all text-xs font-black uppercase tracking-widest"
                   >
                     <Shield size={14} /> Admin Portal
+                  </button>
+                )}
+                {user.isSubscribed && (
+                  <button
+                    onClick={handleBilling}
+                    disabled={billingLoading}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:bg-white/5 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                  >
+                    <Receipt size={14} /> {billingLoading ? 'Opening…' : 'Billing & Invoices'}
                   </button>
                 )}
                 <button

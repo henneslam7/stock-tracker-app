@@ -531,7 +531,7 @@ Schema (30 objects total):
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${appUrl}?subscribed=1`,
+        success_url: `${appUrl}?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url:  `${appUrl}?subscribed=0`,
         customer_email: decoded.email || undefined,
         metadata: { userId: decoded.uid },
@@ -539,6 +539,57 @@ Schema (30 objects total):
       res.json({ url: session.url });
     } catch (e: any) {
       console.error('Stripe session error:', e.message);
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/stripe/verify-session', async (req: any, res: any) => {
+    try {
+      const decoded = await verifyToken(req.headers.authorization);
+      const sessionId = req.query.session_id as string;
+      if (!sessionId) return res.status(400).json({ error: 'session_id required' });
+      const stripe = getStripe();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (session.payment_status !== 'paid' || session.metadata?.userId !== decoded.uid) {
+        return res.json({ subscribed: false });
+      }
+      const db = getAdminFirestore();
+      await db.collection('users').doc(decoded.uid).set(
+        {
+          isSubscribed: true,
+          subscriptionSource: 'stripe',
+          stripeCustomerId: session.customer as string || null,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      res.json({ subscribed: true });
+    } catch (e: any) {
+      console.error('Verify session error:', e.message);
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/stripe/customer-portal', async (req: any, res: any) => {
+    try {
+      const decoded = await verifyToken(req.headers.authorization);
+      const stripe = getStripe();
+      const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
+      const db = getAdminFirestore();
+      const userDoc = await db.collection('users').doc(decoded.uid).get();
+      let customerId = userDoc.data()?.stripeCustomerId as string | undefined;
+      if (!customerId && decoded.email) {
+        const customers = await stripe.customers.list({ email: decoded.email, limit: 1 });
+        customerId = customers.data[0]?.id;
+      }
+      if (!customerId) return res.status(404).json({ error: 'No billing account found' });
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: appUrl,
+      });
+      res.json({ url: portal.url });
+    } catch (e: any) {
+      console.error('Customer portal error:', e.message);
       res.status(400).json({ error: e.message });
     }
   });
@@ -561,7 +612,12 @@ Schema (30 objects total):
         try {
           const db = getAdminFirestore();
           await db.collection('users').doc(userId).set(
-            { isSubscribed: true, subscriptionSource: 'stripe', updatedAt: FieldValue.serverTimestamp() },
+            {
+              isSubscribed: true,
+              subscriptionSource: 'stripe',
+              stripeCustomerId: session.customer as string || null,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
             { merge: true }
           );
         } catch (e: any) { console.error('Firestore update error:', e.message); }

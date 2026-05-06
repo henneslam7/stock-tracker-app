@@ -68,28 +68,49 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('subscribed') === '1') {
+      const sessionId = params.get('session_id');
       window.history.replaceState({}, '', window.location.pathname);
       showToast('Payment received! Activating your subscription…');
-      // Webhook may take a few seconds — poll until isSubscribed flips true
-      let attempts = 0;
-      const poll = async () => {
-        await refreshUser();
-        attempts++;
-        // Re-read latest user state via a fresh Firestore fetch
-        const { getDocFromServer, doc } = await import('firebase/firestore');
-        const { auth, db } = await import('./lib/firebase');
-        if (!auth.currentUser) return;
-        const snap = await getDocFromServer(doc(db, 'users', auth.currentUser.uid));
-        if (snap.exists() && snap.data().isSubscribed) {
-          showToast('Subscription activated! AI Analysis unlocked. 🎉');
-          await refreshUser();
-        } else if (attempts < 6) {
-          setTimeout(poll, 3000);
-        } else {
-          showToast('Subscription saved — please refresh if AI is still locked.', 'error');
-        }
+
+      const activate = async () => {
+        const { auth } = await import('./lib/firebase');
+        if (!auth.currentUser) { setTimeout(activate, 1500); return; }
+        try {
+          const token = await auth.currentUser.getIdToken();
+          const url = sessionId
+            ? `/api/stripe/verify-session?session_id=${encodeURIComponent(sessionId)}`
+            : null;
+          if (url) {
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            if (data.subscribed) {
+              await refreshUser();
+              showToast('Subscription activated! AI Analysis unlocked.');
+              return;
+            }
+          }
+        } catch { /* fall through to polling */ }
+        // Fallback: poll Firestore directly
+        let attempts = 0;
+        const poll = async () => {
+          attempts++;
+          const { getDocFromServer, doc } = await import('firebase/firestore');
+          const { auth: a, db } = await import('./lib/firebase');
+          if (!a.currentUser) return;
+          const snap = await getDocFromServer(doc(db, 'users', a.currentUser.uid));
+          if (snap.exists() && snap.data().isSubscribed) {
+            showToast('Subscription activated! AI Analysis unlocked.');
+            await refreshUser();
+          } else if (attempts < 8) {
+            setTimeout(poll, 3000);
+          } else {
+            showToast('Subscription saved — please refresh if AI is still locked.', 'error');
+          }
+        };
+        setTimeout(poll, 2000);
       };
-      setTimeout(poll, 2000);
+
+      setTimeout(activate, 1000);
     } else if (params.get('subscribed') === '0') {
       window.history.replaceState({}, '', window.location.pathname);
     }
