@@ -33,8 +33,7 @@ function ensureAdminApp() {
 
 function getAdminFirestore() {
   ensureAdminApp();
-  const dbId = process.env.FIREBASE_DATABASE_ID;
-  return dbId ? getFirestore(dbId) : getFirestore();
+  return getFirestore(); // always default DB — named DB caused silent write failures
 }
 
 async function verifyToken(authHeader: string | undefined) {
@@ -550,19 +549,27 @@ Schema (30 objects total):
       if (!sessionId) return res.status(400).json({ error: 'session_id required' });
       const stripe = getStripe();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
+      console.log(`verify-session: status=${session.status} payment_status=${session.payment_status} userId_meta=${session.metadata?.userId} uid=${decoded.uid}`);
       if (session.payment_status !== 'paid' || session.metadata?.userId !== decoded.uid) {
-        return res.json({ subscribed: false });
+        return res.json({ subscribed: false, paymentStatus: session.payment_status });
       }
-      const db = getAdminFirestore();
-      await db.collection('users').doc(decoded.uid).set(
-        {
-          isSubscribed: true,
-          subscriptionSource: 'stripe',
-          stripeCustomerId: session.customer as string || null,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+      try {
+        const db = getAdminFirestore();
+        await db.collection('users').doc(decoded.uid).set(
+          {
+            isSubscribed: true,
+            subscriptionSource: 'stripe',
+            stripeCustomerId: session.customer as string || null,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        console.log(`verify-session: Firestore write OK for uid=${decoded.uid}`);
+      } catch (fsErr: any) {
+        console.error(`verify-session: Firestore write FAILED for uid=${decoded.uid}:`, fsErr.message);
+        // Return subscribed:true so client can do its own write as fallback
+        return res.json({ subscribed: true, firestoreError: fsErr.message });
+      }
       res.json({ subscribed: true });
     } catch (e: any) {
       console.error('Verify session error:', e.message);
@@ -682,6 +689,20 @@ Schema (30 objects total):
     } catch (e: any) {
       console.error('Admin toggle error:', e.message);
       res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/admin/test-firebase', async (req: any, res: any) => {
+    try {
+      const decoded = await verifyToken(req.headers.authorization);
+      if (!isAdminEmail(decoded.email || '')) return res.status(403).json({ error: 'Forbidden' });
+      const db = getAdminFirestore();
+      const testRef = db.collection('_diagnostics').doc('ping');
+      await testRef.set({ ts: FieldValue.serverTimestamp(), by: decoded.email }, { merge: true });
+      res.json({ ok: true, uid: decoded.uid, email: decoded.email });
+    } catch (e: any) {
+      console.error('Firebase diagnostic error:', e.message);
+      res.status(500).json({ ok: false, error: e.message });
     }
   });
 

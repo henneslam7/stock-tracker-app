@@ -73,7 +73,7 @@ export default function App() {
       showToast('Payment received! Activating your subscription…');
 
       const activate = async () => {
-        const { auth } = await import('./lib/firebase');
+        const { auth, db } = await import('./lib/firebase');
         if (!auth.currentUser) { setTimeout(activate, 1500); return; }
         try {
           const token = await auth.currentUser.getIdToken();
@@ -83,13 +83,22 @@ export default function App() {
           if (url) {
             const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
+            console.log('[stripe] verify-session response:', data);
             if (data.subscribed) {
+              if (data.firestoreError) {
+                // Server confirmed payment but Firestore write failed — write from client as fallback
+                const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+                await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                  isSubscribed: true,
+                  updatedAt: serverTimestamp(),
+                });
+              }
               await refreshUser();
               showToast('Subscription activated! AI Analysis unlocked.');
               return;
             }
           }
-        } catch { /* fall through to polling */ }
+        } catch (e) { console.error('[stripe] verify-session error:', e); /* fall through to polling */ }
         // Fallback: poll Firestore directly
         let attempts = 0;
         const poll = async () => {
