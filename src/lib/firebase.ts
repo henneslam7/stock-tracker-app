@@ -16,8 +16,7 @@ import { PortfolioItem } from '../types';
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-// Use the firestoreDatabaseId from the config
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app);
 
 const googleProvider = new GoogleAuthProvider();
 

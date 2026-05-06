@@ -13,8 +13,6 @@ services:
         sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
-      - key: FIREBASE_DATABASE_ID
-        value: "ai-studio-0211050e-2738-46ed-8b77-e25070977f5e"
       - key: ADMIN_EMAILS
         sync: false
       - key: STRIPE_SECRET_KEY
