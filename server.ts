@@ -635,7 +635,7 @@ Schema (30 objects total):
       const sub = event.data.object as Stripe.Subscription;
       const userId = (sub.metadata as any)?.userId;
       // Revoke access when subscription ends or is cancelled (status: canceled/unpaid/past_due)
-      const inactive = ['canceled', 'unpaid', 'past_due'].includes(sub.status);
+      const inactive = ['canceled', 'unpaid', 'past_due', 'paused'].includes(sub.status);
       if (userId && (event.type === 'customer.subscription.deleted' || inactive)) {
         try {
           const db = getAdminFirestore();
