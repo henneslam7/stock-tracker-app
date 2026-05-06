@@ -180,6 +180,8 @@ export default function App() {
   };
 
   const loadRecommendations = async () => {
+    if (!user) { setShowAuthModal(true); return; }
+    if (!user.isSubscribed && !user.isAdmin) { setShowSubscribe(true); return; }
     setActiveTab("discover");
     if (recommendations.length === 0) {
       const recs = await getRecommendations();
