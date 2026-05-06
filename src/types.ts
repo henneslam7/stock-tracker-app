@@ -1,6 +1,6 @@
 export type Sentiment = 'High' | 'Mild' | 'Low';
 export type ChartTimeframe = '1m' | '3m' | '6m' | '1y';
-export type ActiveTab = 'portfolio' | 'watchlist' | 'discover';
+export type ActiveTab = 'portfolio' | 'watchlist' | 'discover' | 'builder';
 
 export interface Stock {
   symbol: string;
@@ -56,6 +56,21 @@ export interface AIAnalysis {
     macd: string;
     signal: string;
   };
+}
+
+export interface PortfolioAllocation {
+  symbol: string;
+  name: string;
+  market: 'US' | 'HK' | 'ETF';
+  percentage: number;
+  reason: string;
+}
+
+export interface PortfolioPlan {
+  summary: string;
+  riskProfile: 'Conservative' | 'Moderate' | 'Aggressive';
+  allocations: PortfolioAllocation[];
+  cashReservePercent: number;
 }
 
 export interface Recommendation {

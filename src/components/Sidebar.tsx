@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { Activity, PieChart as PieChartIcon, List, Compass, Search, RefreshCw, Menu, X } from "lucide-react";
+import { Activity, PieChart as PieChartIcon, List, Compass, Search, RefreshCw, Menu, X, Wand2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ActiveTab } from "../types";
 
@@ -11,9 +11,10 @@ interface SidebarProps {
   onLoadRecommendations: () => void;
   onSearchFocus: () => void;
   onRefresh: () => void;
+  onOpenBuilder: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearchFocus, onRefresh }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearchFocus, onRefresh, onOpenBuilder }: SidebarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navItems = [
@@ -24,6 +25,7 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
   const closeMenu = () => setMenuOpen(false);
 
   const handleDiscover = () => { onLoadRecommendations(); closeMenu(); };
+  const handleBuilder  = () => { onOpenBuilder(); closeMenu(); };
   const handleSearch   = () => { onSearchFocus(); closeMenu(); };
   const handleRefresh  = () => { onRefresh(); closeMenu(); };
   const handleTab      = (tab: ActiveTab) => { onTabChange(tab); closeMenu(); };
@@ -60,6 +62,17 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
             )}
           >
             <Compass size={24} />
+          </button>
+
+          <button
+            onClick={onOpenBuilder}
+            title="AI Portfolio Builder"
+            className={cn(
+              "p-3 rounded-2xl transition-all duration-300",
+              activeTab === "builder" ? "bg-violet-500/20 text-violet-300 shadow-xl shadow-violet-500/10" : "hover:text-white"
+            )}
+          >
+            <Wand2 size={24} />
           </button>
 
           <button
@@ -100,7 +113,7 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
         <button
           onClick={onLoadRecommendations}
           className={cn(
-            "flex flex-col items-center gap-1 py-3 px-4 rounded-2xl transition-all",
+            "flex flex-col items-center gap-1 py-3 px-3 rounded-2xl transition-all",
             activeTab === "discover" ? "text-accent" : "text-slate-600"
           )}
         >
@@ -108,8 +121,18 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
           <span className="text-[9px] font-black uppercase tracking-widest">Discover</span>
         </button>
         <button
+          onClick={onOpenBuilder}
+          className={cn(
+            "flex flex-col items-center gap-1 py-3 px-3 rounded-2xl transition-all",
+            activeTab === "builder" ? "text-violet-400" : "text-slate-600"
+          )}
+        >
+          <Wand2 size={22} />
+          <span className="text-[9px] font-black uppercase tracking-widest">Builder</span>
+        </button>
+        <button
           onClick={() => setMenuOpen(true)}
-          className="flex flex-col items-center gap-1 py-3 px-4 text-slate-600 hover:text-white transition-colors"
+          className="flex flex-col items-center gap-1 py-3 px-3 text-slate-600 hover:text-white transition-colors"
         >
           <Menu size={22} />
           <span className="text-[9px] font-black uppercase tracking-widest">More</span>
@@ -157,6 +180,7 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
                     { icon: PieChartIcon, label: 'Portfolio',   action: () => handleTab('portfolio'),  active: activeTab === 'portfolio' },
                     { icon: List,         label: 'Watchlist',   action: () => handleTab('watchlist'),  active: activeTab === 'watchlist' },
                     { icon: Compass,      label: 'AI Discover', action: handleDiscover,                active: activeTab === 'discover' },
+                    { icon: Wand2,        label: 'AI Builder',  action: handleBuilder,                 active: activeTab === 'builder' },
                     { icon: Search,       label: 'Search',      action: handleSearch,                  active: false },
                     { icon: RefreshCw,    label: 'Refresh Data',action: handleRefresh,                 active: false },
                   ].map(({ icon: Icon, label, action, active }) => (

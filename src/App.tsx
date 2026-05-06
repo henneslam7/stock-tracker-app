@@ -22,6 +22,7 @@ import { StockIntelCard } from "./components/StockIntelCard";
 import { StockDrawer } from "./components/StockDrawer";
 import { SellModal } from "./components/SellModal";
 import { AdminPortal } from "./components/AdminPortal";
+import { PortfolioBuilder } from "./components/PortfolioBuilder";
 import { SubscribeModal } from "./components/SubscribeModal";
 import { UserMenu } from "./components/UserMenu";
 import { AuthModal } from "./components/AuthModal";
@@ -238,6 +239,12 @@ export default function App() {
     }
   };
 
+  const openBuilder = () => {
+    setSelectedStock(null);
+    setShowAdmin(false);
+    setActiveTab("builder");
+  };
+
   const addToPortfolioManual = (symbol: string, shares: number, buyPrice: number) => {
     if (shares <= 0) return;
     const cost = buyPrice * shares;
@@ -341,6 +348,7 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onLoadRecommendations={loadRecommendations}
+        onOpenBuilder={openBuilder}
         onSearchFocus={() => searchInputRef.current?.focus()}
         onRefresh={() => window.location.reload()}
       />
@@ -367,6 +375,15 @@ export default function App() {
 
         {showAdmin ? (
           <AdminPortal onBack={() => setShowAdmin(false)} />
+        ) : activeTab === "builder" && !selectedStock ? (
+          <div className="bento-card p-5 flex flex-col gap-0 overflow-y-auto flex-1 min-h-0">
+            <PortfolioBuilder
+              user={user}
+              watchlist={watchlist}
+              onLoginRequired={() => setShowAuthModal(true)}
+              onSubscribeRequired={() => setShowSubscribe(true)}
+            />
+          </div>
         ) : selectedStock ? (
           <StockDrawer
             inline
@@ -389,7 +406,7 @@ export default function App() {
             <div className="md:col-span-8 md:row-span-5 bento-card p-4 overflow-hidden flex flex-col min-h-[400px] md:min-h-0">
               <div className="flex items-center justify-between px-4 py-2 mb-2">
                 <h3 className="font-black text-white uppercase tracking-widest text-xs">
-                  {activeTab === "portfolio" ? "Holdings" : activeTab === "watchlist" ? "Watchlist" : "AI Recommendations"}
+                  {activeTab === "portfolio" ? "Holdings" : activeTab === "watchlist" ? "Watchlist" : activeTab === "discover" ? "AI Recommendations" : "AI Builder"}
                 </h3>
               </div>
               <AssetList

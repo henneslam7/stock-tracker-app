@@ -517,6 +517,70 @@ Schema (30 objects total):
     }
   });
 
+  // ── AI Portfolio Builder ──────────────────────────────────────────────────────
+
+  app.post('/api/ai/portfolio-builder', async (req: any, res: any) => {
+    try {
+      const decoded = await verifyToken(req.headers.authorization);
+      const db = getAdminFirestore();
+      const userDoc = await db.collection('users').doc(decoded.uid).get();
+      const userData = userDoc.data() || {};
+      if (!userData.isSubscribed && !userData.isAdmin) {
+        return res.status(403).json({ error: 'Subscription required' });
+      }
+      const { amount, currency, preferredStocks = [] } = req.body as {
+        amount: number;
+        currency: 'USD' | 'HKD';
+        preferredStocks: string[];
+      };
+      if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const market = currency === 'HKD' ? 'Hong Kong (HKEX)' : 'US (NYSE/NASDAQ)';
+      const preferredNote = preferredStocks.length
+        ? `User prefers these stocks (include as many as suitable): ${preferredStocks.join(', ')}.`
+        : `No preferences — pick the best ${currency === 'HKD' ? 'HK' : 'US'} stocks for this budget.`;
+      const prompt = `You are an expert portfolio manager. Build an investment portfolio for a client.
+
+Budget: ${currency} ${amount.toLocaleString()}
+Primary market: ${market}
+${preferredNote}
+
+Rules:
+- Allocate 5 to 8 positions (leave 5-15% as cash reserve)
+- If preferred stocks given, include them if appropriate; skip any that are too risky for the budget
+- Mix sectors for diversification
+- All "reason" fields must be in Traditional Chinese (Cantonese style), 1-2 sentences max
+- Output ONLY a raw JSON object, no markdown, no code fences
+
+Schema:
+{
+  "summary": string (Traditional Chinese, 2-3 sentences, overall strategy),
+  "riskProfile": "Conservative" | "Moderate" | "Aggressive",
+  "cashReservePercent": number (5-15),
+  "allocations": [
+    {
+      "symbol": string,
+      "name": string,
+      "market": "US" | "HK" | "ETF",
+      "percentage": number,
+      "reason": string (Traditional Chinese)
+    }
+  ]
+}`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      let plan: any = {};
+      try { plan = JSON.parse(response.text || '{}'); } catch { plan = {}; }
+      res.json(plan);
+    } catch (e: any) {
+      console.error('Portfolio builder error:', e.message);
+      res.status(400).json({ error: e.message });
+    }
+  });
+
   // ── Stripe ───────────────────────────────────────────────────────────────────
 
   app.post('/api/stripe/create-checkout-session', async (req: any, res: any) => {
