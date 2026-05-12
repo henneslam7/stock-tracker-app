@@ -399,10 +399,29 @@ async function startServer() {
         .map((n: any) => `• ${n.title}${n.summary ? ': ' + n.summary : ''}`)
         .join('\n') || 'No recent news.';
 
+      // Detect inverse/leveraged bear ETFs so the AI frames levels correctly
+      const nameLC = (stock.name || '').toLowerCase();
+      const symUC  = (stock.symbol || '').toUpperCase();
+      const isInverse =
+        /bear|short|inverse|ultra short|-1x|-2x|-3x/i.test(nameLC) ||
+        /^(SQQQ|SPXS|SOXS|TZA|SDOW|UVXY|SH|PSQ|DOG|RWM|QID|SDS|SRTY|SMDD|LABD|TECS|FNGD|DRIP|SCO|DUG|OILD|HIBS|BERZ|WEBS)$/.test(symUC);
+
+      const inverseNote = isInverse ? `
+⚠️ INSTRUMENT TYPE: INVERSE / LEVERAGED BEAR ETF
+This product moves OPPOSITE to its benchmark index or sector.
+- Price RISES when the underlying market/sector FALLS
+- Price FALLS when the underlying market/sector RISES
+- "sentiment":"High" means the SHORT THESIS is strong (market expected to keep falling)
+- buyInPrice  — best entry to ADD this inverse position (expecting further market decline)
+- sellingPrice — target to EXIT with profit (underlying market has fallen enough)
+- cutLossPrice — stop-loss if underlying market RECOVERS and this ETF price drops
+- Do NOT treat this like a standard long equity. All analysis must account for the inverse relationship.
+` : '';
+
       const prompt = `
 You are a senior quantitative analyst. Output ONLY raw JSON — no markdown, no code fences.
 All text fields MUST be written in Traditional Chinese (Cantonese).
-
+${inverseNote}
 ═══ STOCK DATA ═══
 Symbol: ${stock.symbol} (${stock.name})
 Current Price: $${stock.price}
@@ -418,9 +437,9 @@ ${JSON.stringify(historicalData ? historicalData.slice(-20) : [])}
 ${newsText}
 
 ═══ INSTRUCTIONS ═══
-1. buyInPrice  — optimal entry based on chart support near CURRENT price $${stock.price}
-2. sellingPrice — profit target from user entry $${userEntryPrice}, aligned to chart resistance
-3. cutLossPrice — stop-loss 5–15% below current price $${stock.price}
+1. buyInPrice  — optimal entry based on chart support near CURRENT price $${stock.price}${isInverse ? ' (entry to add inverse position)' : ''}
+2. sellingPrice — profit target from user entry $${userEntryPrice}, aligned to chart resistance${isInverse ? ' (exit inverse position with profit)' : ''}
+3. cutLossPrice — stop-loss 5–15% below current price $${stock.price}${isInverse ? ' (exit if market reverses against short thesis)' : ''}
 4. newsInsight  — 2–3 sentences (Cantonese) on how the news affects near-term outlook
 5. summary      — 2-sentence overall market outlook (Cantonese)
 6. opportunities — at least 3 specific growth catalysts (Cantonese)

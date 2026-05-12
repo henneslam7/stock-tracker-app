@@ -317,7 +317,7 @@ export function StockDrawer({
 
   const AISection = (
     <section className={cn(
-      "p-8 rounded-[2.5rem] relative overflow-hidden transition-all duration-500 border border-white/5",
+      "p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] relative overflow-hidden transition-all duration-500 border border-white/5",
       !aiAnalysis ? "bg-black/40" : "bg-[#1a1c22] border-blue-500/20 shadow-2xl shadow-blue-500/5"
     )}>
       <AnimatePresence mode="wait">
@@ -325,53 +325,54 @@ export function StockDrawer({
           <motion.div key="cta" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="flex flex-col items-center text-center py-6"
           >
-            <div className="w-20 h-20 bg-blue-500/10 rounded-3xl flex items-center justify-center mb-6 relative">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-500/10 rounded-3xl flex items-center justify-center mb-4 sm:mb-6 relative">
               <div className="absolute inset-0 rounded-3xl bg-blue-500/10 animate-ping" />
-              <BrainCircuit size={40} className="text-blue-400 relative z-10" />
+              <BrainCircuit size={32} className="text-blue-400 relative z-10 sm:hidden" />
+              <BrainCircuit size={40} className="text-blue-400 relative z-10 hidden sm:block" />
             </div>
-            <h4 className="text-2xl font-black mb-4 tracking-tight text-white">AI Quantitative Intel</h4>
-            <p className="text-slate-500 text-sm mb-8 max-w-sm font-medium leading-relaxed">
+            <h4 className="text-lg sm:text-2xl font-black mb-3 sm:mb-4 tracking-tight text-white">AI Quantitative Intel</h4>
+            <p className="text-slate-500 text-xs sm:text-sm mb-6 sm:mb-8 max-w-sm font-medium leading-relaxed">
               Comprehensive analysis of technicals, fundamentals, and latest news using Gemini AI.
             </p>
             {canAnalyze ? (
               <button onClick={onAnalyze} disabled={isAnalyzing}
-                className="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-black transition-all disabled:opacity-50 flex items-center gap-3 text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95"
+                className="bg-blue-600 hover:bg-blue-500 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black transition-all disabled:opacity-50 flex items-center gap-3 text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 text-sm"
               >
-                {isAnalyzing ? <RefreshCw className="animate-spin" size={20} /> : <ArrowUpRight size={20} />}
+                {isAnalyzing ? <RefreshCw className="animate-spin" size={18} /> : <ArrowUpRight size={18} />}
                 {isAnalyzing ? "Processing Data..." : "Run AI Analysis"}
               </button>
             ) : (
               <button onClick={onSubscribeRequired}
-                className="bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/10 px-10 py-4 rounded-2xl font-black transition-all flex items-center gap-3 text-slate-400 hover:text-white"
+                className="bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/10 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black transition-all flex items-center gap-3 text-slate-400 hover:text-white text-sm"
               >
-                <Lock size={20} />
+                <Lock size={18} />
                 Subscribe to Unlock
               </button>
             )}
           </motion.div>
         ) : (
-          <motion.div key="report" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8">
+          <motion.div key="report" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-5 sm:space-y-8">
             {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-600/20"><BrainCircuit size={20} /></div>
-                <h4 className="font-black text-xl text-white tracking-tight">AI Intelligence Report</h4>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-600/20"><BrainCircuit size={16} className="sm:hidden" /><BrainCircuit size={20} className="hidden sm:block" /></div>
+                <h4 className="font-black text-base sm:text-xl text-white tracking-tight">AI Intelligence Report</h4>
               </div>
-              <div className={cn("px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 shadow-sm border", sentimentColor)}>
-                <span className={cn("w-2 h-2 rounded-full", aiAnalysis.sentiment === 'High' ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
+              <div className={cn("px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] flex items-center gap-1.5 sm:gap-2 shadow-sm border", sentimentColor)}>
+                <span className={cn("w-1.5 h-1.5 rounded-full", aiAnalysis.sentiment === 'High' ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
                 {aiAnalysis.sentiment}
                 <Hint text="Overall AI sentiment. High = bullish outlook, Mild = neutral/mixed, Low = bearish." />
               </div>
             </div>
 
-            {/* Price target + trading levels */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-black/20 p-6 rounded-3xl border border-white/5 flex flex-col justify-center">
+            {/* Price target + trading levels — stack on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
+              <div className="bg-black/20 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col justify-center">
                 <div className="flex items-center mb-2">
                   <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest leading-none">12M Target</div>
                   <Hint text="AI-projected fair value 12 months out, based on fundamentals, technicals, and current momentum." />
                 </div>
-                <div className="text-4xl font-black data-value text-blue-400 tracking-tighter">${aiAnalysis.priceTarget.toFixed(2)}</div>
+                <div className="text-2xl sm:text-4xl font-black data-value text-blue-400 tracking-tighter">${aiAnalysis.priceTarget.toFixed(2)}</div>
                 <PriceDelta
                   price={aiAnalysis.priceTarget}
                   fromColor={aiAnalysis.priceTarget >= stock.price ? "text-emerald-400" : "text-rose-400"}
@@ -381,7 +382,7 @@ export function StockDrawer({
                 />
               </div>
 
-              <div className="bg-black/20 p-6 rounded-3xl border border-white/5">
+              <div className="bg-black/20 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
                 <div className="flex items-center mb-3">
                   <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest leading-none">Trading Levels</div>
                   <Hint text="AI-derived price levels for managing your position. Use as reference, not guarantees." />
@@ -404,7 +405,7 @@ export function StockDrawer({
                         : "Target price to lock in gains. Based on entry price and chart resistance."} />
                     </div>
                     <div className="text-right">
-                      <div className="font-mono font-black text-lg text-white data-value">${aiAnalysis.sellingPrice.toFixed(2)}</div>
+                      <div className="font-mono font-black text-base sm:text-lg text-white data-value">${aiAnalysis.sellingPrice.toFixed(2)}</div>
                       <PriceDelta price={aiAnalysis.sellingPrice} fromColor="text-slate-500" avgColor="text-emerald-500" />
                     </div>
                   </div>
@@ -416,7 +417,7 @@ export function StockDrawer({
                       <Hint text="Optimal entry based on current market price and chart support levels." />
                     </div>
                     <div className="text-right">
-                      <div className="font-mono font-black text-lg text-white data-value">${aiAnalysis.buyInPrice.toFixed(2)}</div>
+                      <div className="font-mono font-black text-base sm:text-lg text-white data-value">${aiAnalysis.buyInPrice.toFixed(2)}</div>
                       <PriceDelta price={aiAnalysis.buyInPrice} fromColor="text-slate-500" avgColor="text-blue-400" />
                     </div>
                   </div>
@@ -430,7 +431,7 @@ export function StockDrawer({
                         : "Stop-loss price. Exit to cap downside. Typically 5–15% below current price."} />
                     </div>
                     <div className="text-right">
-                      <div className="font-mono font-black text-lg text-white data-value">${aiAnalysis.cutLossPrice.toFixed(2)}</div>
+                      <div className="font-mono font-black text-base sm:text-lg text-white data-value">${aiAnalysis.cutLossPrice.toFixed(2)}</div>
                       <PriceDelta
                         price={aiAnalysis.cutLossPrice}
                         fromColor="text-slate-500"
@@ -457,13 +458,13 @@ export function StockDrawer({
             </div>
 
             {/* Summary */}
-            <p className="text-slate-400 text-sm leading-relaxed font-medium bg-black/20 p-6 rounded-3xl italic border-l-4 border-blue-600">
+            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed font-medium bg-black/20 p-4 sm:p-6 rounded-2xl sm:rounded-3xl italic border-l-4 border-blue-600">
               "{aiAnalysis.summary}"
             </p>
 
             {/* News insight */}
             {aiAnalysis.newsInsight && (
-              <div className="bg-amber-500/5 border border-amber-500/20 rounded-3xl p-6">
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl sm:rounded-3xl p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <Newspaper size={14} className="text-amber-400" />
                   <span className="text-[9px] font-black uppercase tracking-widest text-amber-400">News Impact Analysis</span>
@@ -475,13 +476,13 @@ export function StockDrawer({
 
             {/* RSI + MACD */}
             {aiAnalysis.technicals && (
-              <div className="flex gap-4">
-                <div className="flex-1 bg-white/[0.04] p-4 rounded-2xl border border-white/5 text-center">
-                  <div className="flex items-center justify-center mb-2">
+              <div className="flex gap-3 sm:gap-4">
+                <div className="flex-1 bg-white/[0.04] p-3 sm:p-4 rounded-2xl border border-white/5 text-center">
+                  <div className="flex items-center justify-center mb-1.5 sm:mb-2">
                     <div className="text-[9px] text-slate-500 uppercase font-black">RSI (14)</div>
                     <Hint text="Relative Strength Index. Above 70 = overbought. Below 30 = oversold. 30–70 = neutral." />
                   </div>
-                  <div className={cn("text-lg font-black",
+                  <div className={cn("text-base sm:text-lg font-black",
                     aiAnalysis.technicals.rsi > 70 ? "text-rose-400" :
                     aiAnalysis.technicals.rsi < 30 ? "text-emerald-400" : "text-white"
                   )}>{aiAnalysis.technicals.rsi}</div>
@@ -489,12 +490,12 @@ export function StockDrawer({
                     {aiAnalysis.technicals.rsi > 70 ? "Overbought" : aiAnalysis.technicals.rsi < 30 ? "Oversold" : "Neutral"}
                   </div>
                 </div>
-                <div className="flex-1 bg-white/[0.04] p-4 rounded-2xl border border-white/5 text-center">
-                  <div className="flex items-center justify-center mb-2">
+                <div className="flex-1 bg-white/[0.04] p-3 sm:p-4 rounded-2xl border border-white/5 text-center">
+                  <div className="flex items-center justify-center mb-1.5 sm:mb-2">
                     <div className="text-[9px] text-slate-500 uppercase font-black">MACD</div>
                     <Hint text="Positive = bullish momentum. Negative = bearish. Watch for signal line crossovers." />
                   </div>
-                  <div className={cn("text-lg font-black font-mono",
+                  <div className={cn("text-base sm:text-lg font-black font-mono",
                     aiAnalysis.technicals.macd.startsWith('+') ? "text-emerald-400" : "text-rose-400"
                   )}>{aiAnalysis.technicals.macd}</div>
                   <div className="flex items-center justify-center mt-1">
@@ -505,27 +506,27 @@ export function StockDrawer({
             )}
 
             {/* Opportunities + Risks */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8">
+              <div className="space-y-3 sm:space-y-4">
                 <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Growth Catalysts
                 </h5>
-                <ul className="space-y-3">
+                <ul className="space-y-2 sm:space-y-3">
                   {aiAnalysis.opportunities.map((opp, i) => (
-                    <li key={i} className="text-xs text-slate-400 font-bold leading-snug flex items-start gap-3 bg-white/[0.02] p-4 rounded-2xl border border-white/5">
-                      <ChevronRight size={14} className="text-emerald-400 mt-0.5 shrink-0" /> {opp}
+                    <li key={i} className="text-xs text-slate-400 font-bold leading-snug flex items-start gap-2 sm:gap-3 bg-white/[0.02] p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/5">
+                      <ChevronRight size={13} className="text-emerald-400 mt-0.5 shrink-0" /> {opp}
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Strategic Risks
                 </h5>
-                <ul className="space-y-3">
+                <ul className="space-y-2 sm:space-y-3">
                   {aiAnalysis.risks.map((risk, i) => (
-                    <li key={i} className="text-xs text-slate-400 font-bold leading-snug flex items-start gap-3 bg-white/[0.02] p-4 rounded-2xl border border-white/5">
-                      <ChevronRight size={14} className="text-rose-400 mt-0.5 shrink-0" /> {risk}
+                    <li key={i} className="text-xs text-slate-400 font-bold leading-snug flex items-start gap-2 sm:gap-3 bg-white/[0.02] p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/5">
+                      <ChevronRight size={13} className="text-rose-400 mt-0.5 shrink-0" /> {risk}
                     </li>
                   ))}
                 </ul>
