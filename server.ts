@@ -541,6 +541,95 @@ Schema (30 objects total):
     }
   });
 
+  // ── ETF Sentiment Analysis ───────────────────────────────────────────────────
+
+  app.get('/api/etf-sentiment', async (_req: any, res: any) => {
+    const BULL = ['TQQQ', 'UPRO', 'SPXL', 'SOXL', 'LABU'];
+    const BEAR = ['SQQQ', 'SPXS', 'SOXS', 'TZA', 'UVXY'];
+    const MARKET = ['SPY', 'QQQ'];
+    const ALL = [...BULL, ...BEAR, ...MARKET];
+
+    try {
+      const quoteResults = await Promise.allSettled(
+        ALL.map(sym =>
+          fhFetch(`/quote?symbol=${sym}`).then((q: any) => ({
+            symbol: sym,
+            price: q.c || 0,
+            change: q.d || 0,
+            changePercent: q.dp || 0,
+            prevClose: q.pc || 0,
+          }))
+        )
+      );
+
+      const quotes: Record<string, any> = {};
+      quoteResults.forEach((r, i) => {
+        if (r.status === 'fulfilled') quotes[ALL[i]] = r.value;
+        else quotes[ALL[i]] = { symbol: ALL[i], price: 0, change: 0, changePercent: 0 };
+      });
+
+      let news: any[] = [];
+      try {
+        const rawNews = await fhFetch('/news?category=general&minId=0');
+        news = ((rawNews as any[]) || []).slice(0, 10).map((n: any) => ({
+          title: n.headline,
+          url: n.url,
+          date: n.datetime ? new Date(n.datetime * 1000).toISOString().split('T')[0] : '',
+          source: n.source || '',
+        }));
+      } catch { /* swallow */ }
+
+      const today = new Date().toISOString().split('T')[0];
+      const bullLines = BULL.map(s => `${s}: ${quotes[s]?.changePercent?.toFixed(2) ?? 'N/A'}%`).join(', ');
+      const bearLines = BEAR.map(s => `${s}: ${quotes[s]?.changePercent?.toFixed(2) ?? 'N/A'}%`).join(', ');
+      const spyChg = quotes['SPY']?.changePercent?.toFixed(2) ?? 'N/A';
+      const qqqChg = quotes['QQQ']?.changePercent?.toFixed(2) ?? 'N/A';
+      const newsText = news.slice(0, 6).map((n: any) => `- ${n.title}`).join('\n');
+
+      const prompt = `You are a sharp quantitative market analyst. Today is ${today}.
+
+Current ETF performance:
+Bull ETFs (做多): ${bullLines}
+Bear ETFs (做空): ${bearLines}
+S&P500 (SPY): ${spyChg}%, NASDAQ (QQQ): ${qqqChg}%
+
+Latest market headlines:
+${newsText}
+
+Provide a concise market sentiment analysis (3-4 sentences total). Cover:
+1. Overall market direction (bullish/bearish/neutral) and conviction level
+2. Key signals from the leveraged ETF flow (are bulls or bears dominating?)
+3. What the bear ETF activity implies about market fear vs confidence
+4. Brief near-term outlook based on news
+
+Respond ONLY in valid JSON (no markdown):
+{"sentiment":"Bullish"|"Bearish"|"Neutral"|"Mixed","score":<integer 0-100>,"summary":"<3-4 sentence analysis>","keySignal":"<one key actionable signal>"}`;
+
+      let sentimentData: any = { sentiment: 'Neutral', score: 50, summary: '', keySignal: '' };
+      try {
+        const ai = getGeminiClient();
+        const result = await ai.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        const raw = result.text ?? '{}';
+        sentimentData = JSON.parse(raw);
+      } catch (e) { console.error('ETF Gemini error:', e); }
+
+      res.json({
+        bull: BULL.map(s => quotes[s]),
+        bear: BEAR.map(s => quotes[s]),
+        market: { SPY: quotes['SPY'], QQQ: quotes['QQQ'] },
+        sentiment: sentimentData,
+        news,
+      });
+    } catch (e: any) {
+      console.error('ETF sentiment error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── AI Portfolio Builder ──────────────────────────────────────────────────────
 
   app.post('/api/ai/portfolio-builder', async (req: any, res: any) => {

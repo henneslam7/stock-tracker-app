@@ -19,6 +19,7 @@ import { Header } from "./components/Header";
 import { PortfolioSummaryCard } from "./components/PortfolioSummaryCard";
 import { AssetList } from "./components/AssetList";
 import { StockIntelCard } from "./components/StockIntelCard";
+import { ETFAnalysisCard } from "./components/ETFAnalysisCard";
 import { StockDrawer } from "./components/StockDrawer";
 import { SellModal } from "./components/SellModal";
 import { AdminPortal } from "./components/AdminPortal";
@@ -344,7 +345,7 @@ export default function App() {
   const canAnalyze = !!(user && (user.isSubscribed || user.isAdmin));
 
   return (
-    <div className="flex h-screen bg-bg text-ink font-sans overflow-hidden p-3 md:p-6 gap-3 md:gap-6">
+    <div className="flex h-screen bg-bg text-ink font-sans overflow-hidden p-2 sm:p-3 md:p-6 gap-2 sm:gap-3 md:gap-6">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -354,7 +355,7 @@ export default function App() {
         onRefresh={() => window.location.reload()}
       />
 
-      <div className="flex-1 flex flex-col gap-3 md:gap-6 overflow-y-auto md:overflow-hidden pr-0 md:pr-2 pb-20 md:pb-2 min-w-0">
+      <div className="flex-1 flex flex-col gap-3 sm:gap-4 md:gap-6 overflow-y-auto md:overflow-hidden pr-0 md:pr-2 pb-24 md:pb-2 min-w-0">
         <Header
           marketStatus={marketStatus}
           searchQuery={searchQuery}
@@ -377,12 +378,16 @@ export default function App() {
         {showAdmin ? (
           <AdminPortal onBack={() => setShowAdmin(false)} />
         ) : activeTab === "builder" && !selectedStock ? (
-          <div className="bento-card p-5 flex flex-col gap-0 overflow-y-auto flex-1 min-h-0">
+          <div className="bento-card p-4 sm:p-5 flex flex-col gap-0 overflow-y-auto flex-1 min-h-0">
             <PortfolioBuilder
               user={user}
               onLoginRequired={() => setShowAuthModal(true)}
               onSubscribeRequired={() => setShowSubscribe(true)}
             />
+          </div>
+        ) : activeTab === "market" && !selectedStock ? (
+          <div className="bento-card p-4 sm:p-5 md:p-6 flex-1 overflow-hidden flex flex-col min-h-0">
+            <ETFAnalysisCard />
           </div>
         ) : selectedStock ? (
           <StockDrawer
@@ -400,11 +405,11 @@ export default function App() {
             onSubscribeRequired={() => setShowSubscribe(true)}
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-12 md:grid-rows-[repeat(5,minmax(130px,1fr))] md:overflow-hidden md:flex-1 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 md:grid-rows-[repeat(5,minmax(130px,1fr))] md:overflow-hidden md:flex-1 gap-3 sm:gap-4 md:gap-6">
             <PortfolioSummaryCard portfolioValue={portfolioValue} portfolioGain={portfolioGain} lifetimeGain={lifetimeGain} />
 
-            <div className="md:col-span-8 md:row-span-5 bento-card p-4 overflow-hidden flex flex-col min-h-[400px] md:min-h-0">
-              <div className="flex items-center justify-between px-4 py-2 mb-2">
+            <div className="md:col-span-8 md:row-span-5 bento-card p-3 sm:p-4 overflow-hidden flex flex-col min-h-[360px] sm:min-h-[400px] md:min-h-0">
+              <div className="flex items-center justify-between px-2 sm:px-4 py-2 mb-2">
                 <h3 className="font-black text-white uppercase tracking-widest text-xs">
                   {activeTab === "portfolio" ? "Holdings" : activeTab === "watchlist" ? "Watchlist" : activeTab === "discover" ? "AI Recommendations" : "AI Builder"}
                 </h3>
