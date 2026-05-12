@@ -34,8 +34,11 @@ Drop caveman for: security warnings, irreversible action confirmations, multi-st
 
 **Every PR that ships user-facing changes MUST bump `package.json` version in the same commit.**
 
-- Patch fix → bump patch (e.g. 1.4.0 → 1.4.1)
-- New feature / new tab / new component → bump minor (e.g. 1.4.0 → 1.5.0)
-- Breaking redesign → bump major
+| Change type | Rule | Example |
+|-------------|------|---------|
+| Small fix / tweak / copy | bump patch | 1.4.1 → 1.4.2 |
+| Patch digits reach .9 | next patch still .9→.10 is fine, or roll to minor | 1.4.9 → 1.4.10 or 1.5.0 |
+| New feature / new tab / new component | bump minor, reset patch to 0 | 1.4.3 → 1.5.0 |
+| Breaking redesign / major refactor | bump major | 1.x.x → 2.0.0 |
 
-The version is injected at build time via `__APP_VERSION__` (vite.config.ts) and shown in the app header. Separate version-bump PRs cause the deployed build to lag behind — always bundle the bump with the feature commit.
+**Never** ship a separate version-bump PR — always bundle the bump with the feature/fix commit. The version is injected at build time via `__APP_VERSION__` (vite.config.ts) and shown in the app header.
