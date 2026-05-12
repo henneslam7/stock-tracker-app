@@ -29,3 +29,13 @@ Switch: `/caveman lite|full|ultra`.
 
 ### Auto-Clarity Override
 Drop caveman for: security warnings, irreversible action confirmations, multi-step sequences where fragment order risks misread.
+
+## Version Bump Rule
+
+**Every PR that ships user-facing changes MUST bump `package.json` version in the same commit.**
+
+- Patch fix → bump patch (e.g. 1.4.0 → 1.4.1)
+- New feature / new tab / new component → bump minor (e.g. 1.4.0 → 1.5.0)
+- Breaking redesign → bump major
+
+The version is injected at build time via `__APP_VERSION__` (vite.config.ts) and shown in the app header. Separate version-bump PRs cause the deployed build to lag behind — always bundle the bump with the feature commit.
