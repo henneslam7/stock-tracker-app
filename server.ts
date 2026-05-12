@@ -497,18 +497,8 @@ Output JSON (strict schema, no extra keys):
       });
     } catch (e: any) {
       console.error('Analyze error:', e.message);
-      // Return 200 with fallback so the client renders something instead of toast error
-      res.json({
-        sentiment: 'Mild',
-        priceTarget: req.body.stock?.price * 1.05 || 0,
-        buyInPrice:  req.body.stock?.price * 0.95 || 0,
-        sellingPrice: req.body.stock?.price * 1.10 || 0,
-        cutLossPrice: req.body.stock?.price * 0.92 || 0,
-        confidence: 0.5,
-        summary: `分析暫時不可用 (${String(e.message).slice(0, 60)})`,
-        risks: ['市場波動性較大'],
-        opportunities: ['長線增長潛力'],
-      });
+      const is503 = String(e.message).includes('503') || String(e.message).toLowerCase().includes('unavailable');
+      res.status(is503 ? 503 : 500).json({ error: e.message });
     }
   });
 

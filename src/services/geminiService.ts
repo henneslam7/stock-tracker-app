@@ -12,7 +12,10 @@ export async function analyzeStock(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ stock, historicalData, news, quoteSummary, userEntryPrice }),
   });
-  if (!res.ok) throw new Error(`Analysis failed: ${res.status}`);
+  if (!res.ok) {
+    const status = res.status;
+    throw new Error(status === 503 ? 'AI service temporarily unavailable' : `Analysis failed: ${status}`);
+  }
   return res.json();
 }
 
