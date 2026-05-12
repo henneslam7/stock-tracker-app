@@ -399,51 +399,75 @@ async function startServer() {
         .map((n: any) => `• ${n.title}${n.summary ? ': ' + n.summary : ''}`)
         .join('\n') || 'No recent news.';
 
-      // Detect inverse/leveraged bear ETFs so the AI frames levels correctly
       const nameLC = (stock.name || '').toLowerCase();
       const symUC  = (stock.symbol || '').toUpperCase();
-      const isInverse =
-        /bear|short|inverse|ultra short|-1x|-2x|-3x/i.test(nameLC) ||
-        /^(SQQQ|SPXS|SOXS|TZA|SDOW|UVXY|SH|PSQ|DOG|RWM|QID|SDS|SRTY|SMDD|LABD|TECS|FNGD|DRIP|SCO|DUG|OILD|HIBS|BERZ|WEBS)$/.test(symUC);
 
-      const inverseNote = isInverse ? `
-⚠️ INSTRUMENT TYPE: INVERSE / LEVERAGED BEAR ETF
-This product moves OPPOSITE to its benchmark index or sector.
-- Price RISES when the underlying market/sector FALLS
-- Price FALLS when the underlying market/sector RISES
-- "sentiment":"High" means the SHORT THESIS is strong (market expected to keep falling)
-- buyInPrice  — best entry to ADD this inverse position (expecting further market decline)
-- sellingPrice — target to EXIT with profit (underlying market has fallen enough)
-- cutLossPrice — stop-loss if underlying market RECOVERS and this ETF price drops
-- Do NOT treat this like a standard long equity. All analysis must account for the inverse relationship.
+      // Detect any ETF (broad — name keywords or known tickers)
+      const isETF =
+        /\betf\b|\betn\b|\bfund\b|\btrust\b|\bdaily\b|proshares|direxion|tradr|ishares|spdr|vanguard|invesco|2x|3x|leveraged/i.test(nameLC) ||
+        /^(SPY|QQQ|IWM|GLD|TLT|VTI|XLF|XLE|XLK|ARKK|TQQQ|UPRO|SPXL|SOXL|LABU|SQQQ|SPXS|SOXS|TZA|SDOW|UVXY|SH|PSQ|DOG|RWM|QID|SDS|SRTY|SMDD|LABD|TECS|FNGD|DRIP|SCO|DUG|OILD|HIBS|BERZ|WEBS|SNDQ|NVDQ|TSLS|AMDS|MSTU|MSTZ|NVDS|CONL|BITX|FNGU|BULZ|GOGLL|MSFO|AMDQ|CRWDQ|YINN|YANG|JNUG|JDST|DUST|NUGT|GUSH)$/.test(symUC);
+
+      // Detect inverse / leveraged bear ETFs specifically
+      const isInverse = (
+        /bear|short|inverse|ultra short|-1x|-2x|-3x/i.test(nameLC) ||
+        /^(SNDQ|NVDQ|TSLS|AMDS|MSTZ|NVDS|SQQQ|SPXS|SOXS|TZA|SDOW|UVXY|SH|PSQ|DOG|RWM|QID|SDS|SRTY|SMDD|LABD|TECS|FNGD|DRIP|SCO|DUG|OILD|HIBS|BERZ|WEBS|AMDQ|CRWDQ|YANG|JDST|DUST)$/.test(symUC)
+      );
+
+      // Determine if chart data is sufficient for meaningful technicals
+      const chartLength = (historicalData || []).length;
+      const hasSufficientChart = chartLength >= 15;
+
+      const instrumentType = isInverse
+        ? 'INVERSE / LEVERAGED BEAR ETF'
+        : isETF
+          ? 'EXCHANGE TRADED FUND (ETF)'
+          : 'STOCK';
+
+      const etfWarning = isETF
+        ? `\n⚠️ INSTRUMENT TYPE: ${instrumentType}
+${isETF ? '— This is an ETF, NOT a company stock. NEVER use the word "公司" (company) in any output field. Refer to it as "該ETF" or "此產品".' : ''}
+${isInverse ? `— This ETF moves OPPOSITE to its benchmark.
+  · Price RISES when the underlying market/sector FALLS
+  · Price FALLS when the underlying market/sector RISES
+  · sentiment "High" = short thesis is strong (market expected to keep falling)
+  · buyInPrice  = best level to enter/add this inverse position
+  · sellingPrice = target to exit with profit (market fallen enough)
+  · cutLossPrice = stop-loss if market reverses upward (ETF price drops)
+  · opportunities = reasons the market may fall further (supporting the short)
+  · risks = reasons the market may recover (against the short thesis)` : ''}
 ` : '';
 
-      const prompt = `
-You are a senior quantitative analyst. Output ONLY raw JSON — no markdown, no code fences.
+      const chartWarning = !hasSufficientChart
+        ? `\n⚠️ Chart data is limited (${chartLength} candles only). Do NOT rely heavily on technical analysis. Focus on news catalysts and momentum instead.\n`
+        : '';
+
+      const prompt = `You are a senior quantitative analyst. Output ONLY raw JSON — no markdown, no code fences.
 All text fields MUST be written in Traditional Chinese (Cantonese).
-${inverseNote}
-═══ STOCK DATA ═══
+${etfWarning}${chartWarning}
+═══ INSTRUMENT DATA ═══
 Symbol: ${stock.symbol} (${stock.name})
+Type: ${instrumentType}
 Current Price: $${stock.price}
 User Entry Price: $${userEntryPrice}
-PE Ratio: ${stock.peRatio} | 52W Range: $${stock.low52w} – $${stock.high52w}
-Dividend Yield: ${stock.dividendYield} | Beta: ${stock.beta}
+52W Range: $${stock.low52w} – $${stock.high52w}
+Beta: ${stock.beta}
+${!isETF ? `PE Ratio: ${stock.peRatio} | Dividend Yield: ${stock.dividendYield}` : ''}
 Fundamentals: ${JSON.stringify(quoteSummary)}
 
 ═══ TECHNICAL CHART (last 20 candles, chronological) ═══
-${JSON.stringify(historicalData ? historicalData.slice(-20) : [])}
+${JSON.stringify((historicalData || []).slice(-20))}
 
 ═══ RECENT NEWS (analyse sentiment & near-term impact) ═══
 ${newsText}
 
 ═══ INSTRUCTIONS ═══
-1. buyInPrice  — optimal entry based on chart support near CURRENT price $${stock.price}${isInverse ? ' (entry to add inverse position)' : ''}
-2. sellingPrice — profit target from user entry $${userEntryPrice}, aligned to chart resistance${isInverse ? ' (exit inverse position with profit)' : ''}
-3. cutLossPrice — stop-loss 5–15% below current price $${stock.price}${isInverse ? ' (exit if market reverses against short thesis)' : ''}
-4. newsInsight  — 2–3 sentences (Cantonese) on how the news affects near-term outlook
-5. summary      — 2-sentence overall market outlook (Cantonese)
-6. opportunities — at least 3 specific growth catalysts (Cantonese)
-7. risks        — at least 3 specific risk factors (Cantonese)
+1. buyInPrice  — optimal entry near CURRENT price $${stock.price}${isInverse ? ' (add to inverse/short position when momentum continues)' : ''}
+2. sellingPrice — profit target from user entry $${userEntryPrice}${isInverse ? ' (exit short position with gains)' : ', aligned to chart resistance'}
+3. cutLossPrice — stop-loss${isInverse ? ' if underlying market recovers (ETF price drops from current level)' : ' 5–15% below current price $' + stock.price}
+4. newsInsight  — 2–3 sentences (Cantonese) on how recent news affects near-term outlook
+5. summary      — 2-sentence ${isInverse ? 'short thesis outlook' : 'market outlook'} (Cantonese). Do NOT mention "公司".
+6. opportunities — 3+ ${isInverse ? 'reasons the market may fall further (supporting the short thesis)' : 'specific growth catalysts'} (Cantonese)
+7. risks        — 3+ ${isInverse ? 'reasons the market may recover against this short position' : 'specific risk factors'} (Cantonese)
 
 Output JSON (strict schema, no extra keys):
 {
