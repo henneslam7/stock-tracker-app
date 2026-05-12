@@ -206,23 +206,25 @@ export default function App() {
     try {
       const info = await StockService.getStockInfo(selectedStock.symbol);
       const chartPrices: number[] = info.chart?.map((c: any) => c.close) || [];
+      const hasRSIData  = chartPrices.length >= 15;  // RSI needs 14+1
+      const hasMACDData = chartPrices.length >= 35;  // MACD needs 26+9
       const rsi  = calculateRSI(chartPrices);
       const macd = calculateMACD(chartPrices);
       const entryPrice = portfolio.find(p => p.symbol === selectedStock.symbol)?.averagePrice ?? selectedStock.price;
 
       const result = await analyzeStock(
-        { ...selectedStock, rsi } as any,
+        { ...selectedStock, rsi: hasRSIData ? rsi : undefined } as any,
         info.chart, info.news, info.quoteSummary,
         entryPrice
       );
 
       setAiAnalysis({
         ...result,
-        technicals: {
-          rsi: parseFloat(rsi.toFixed(2)),
-          macd:   `${macd.macd   >= 0 ? "+" : ""}${macd.macd.toFixed(3)}`,
-          signal: `${macd.signal >= 0 ? "+" : ""}${macd.signal.toFixed(3)}`,
-        },
+        technicals: (hasRSIData || hasMACDData) ? {
+          rsi:    hasRSIData  ? parseFloat(rsi.toFixed(2)) : 50,
+          macd:   hasMACDData ? `${macd.macd   >= 0 ? "+" : ""}${macd.macd.toFixed(3)}`   : "N/A",
+          signal: hasMACDData ? `${macd.signal >= 0 ? "+" : ""}${macd.signal.toFixed(3)}` : "N/A",
+        } : undefined,
       });
     } catch {
       showToast("Analysis failed. Try again.", "error");
