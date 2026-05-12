@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { Activity, PieChart as PieChartIcon, List, Compass, Search, RefreshCw, Menu, X, Wand2 } from "lucide-react";
+import { Activity, PieChart as PieChartIcon, List, Compass, Search, RefreshCw, Menu, X, Wand2, BarChart2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ActiveTab } from "../types";
 
@@ -20,6 +20,7 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
   const navItems = [
     { tab: 'portfolio' as ActiveTab, icon: PieChartIcon, title: 'Portfolio' },
     { tab: 'watchlist' as ActiveTab, icon: List, title: 'Watchlist' },
+    { tab: 'market' as ActiveTab, icon: BarChart2, title: 'Market' },
   ];
 
   const closeMenu = () => setMenuOpen(false);
@@ -38,7 +39,7 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
           <Activity size={24} />
         </div>
 
-        <div className="flex flex-col gap-8 text-slate-500">
+        <div className="flex flex-col gap-6 text-slate-500">
           {navItems.map(({ tab, icon: Icon, title }) => (
             <button
               key={tab}
@@ -46,7 +47,11 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
               title={title}
               className={cn(
                 "p-3 rounded-2xl transition-all duration-300",
-                activeTab === tab ? "bg-white/10 text-white shadow-xl shadow-white/5" : "hover:text-white"
+                activeTab === tab
+                  ? tab === "market"
+                    ? "bg-accent/20 text-accent shadow-xl shadow-accent/10"
+                    : "bg-white/10 text-white shadow-xl shadow-white/5"
+                  : "hover:text-white"
               )}
             >
               <Icon size={24} />
@@ -95,47 +100,49 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
         </div>
       </nav>
 
-      {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-surface/95 backdrop-blur-xl border-t border-line flex items-center justify-around px-2 pb-safe">
+      {/* Mobile bottom nav — 5 primary items + More */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-surface/95 backdrop-blur-xl border-t border-line flex items-center justify-around px-1 pb-safe">
         {navItems.map(({ tab, icon: Icon, title }) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
             className={cn(
-              "flex flex-col items-center gap-1 py-3 px-4 rounded-2xl transition-all",
-              activeTab === tab ? "text-white" : "text-slate-600"
+              "flex flex-col items-center gap-0.5 py-2.5 px-2 sm:px-3 rounded-xl transition-all min-w-0",
+              activeTab === tab
+                ? tab === "market" ? "text-accent" : "text-white"
+                : "text-slate-600"
             )}
           >
-            <Icon size={22} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{title}</span>
+            <Icon size={20} />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">{title}</span>
           </button>
         ))}
         <button
           onClick={onLoadRecommendations}
           className={cn(
-            "flex flex-col items-center gap-1 py-3 px-3 rounded-2xl transition-all",
+            "flex flex-col items-center gap-0.5 py-2.5 px-2 sm:px-3 rounded-xl transition-all min-w-0",
             activeTab === "discover" ? "text-accent" : "text-slate-600"
           )}
         >
-          <Compass size={22} />
-          <span className="text-[9px] font-black uppercase tracking-widest">Discover</span>
+          <Compass size={20} />
+          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Discover</span>
         </button>
         <button
           onClick={onOpenBuilder}
           className={cn(
-            "flex flex-col items-center gap-1 py-3 px-3 rounded-2xl transition-all",
+            "flex flex-col items-center gap-0.5 py-2.5 px-2 sm:px-3 rounded-xl transition-all min-w-0",
             activeTab === "builder" ? "text-violet-400" : "text-slate-600"
           )}
         >
-          <Wand2 size={22} />
-          <span className="text-[9px] font-black uppercase tracking-widest">Builder</span>
+          <Wand2 size={20} />
+          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Builder</span>
         </button>
         <button
           onClick={() => setMenuOpen(true)}
-          className="flex flex-col items-center gap-1 py-3 px-3 text-slate-600 hover:text-white transition-colors"
+          className="flex flex-col items-center gap-0.5 py-2.5 px-2 sm:px-3 text-slate-600 hover:text-white transition-colors min-w-0"
         >
-          <Menu size={22} />
-          <span className="text-[9px] font-black uppercase tracking-widest">More</span>
+          <Menu size={20} />
+          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">More</span>
         </button>
       </nav>
 
@@ -177,12 +184,13 @@ export function Sidebar({ activeTab, onTabChange, onLoadRecommendations, onSearc
 
                 <div className="space-y-2">
                   {[
-                    { icon: PieChartIcon, label: 'Portfolio',   action: () => handleTab('portfolio'),  active: activeTab === 'portfolio' },
-                    { icon: List,         label: 'Watchlist',   action: () => handleTab('watchlist'),  active: activeTab === 'watchlist' },
-                    { icon: Compass,      label: 'AI Discover', action: handleDiscover,                active: activeTab === 'discover' },
-                    { icon: Wand2,        label: 'AI Builder',  action: handleBuilder,                 active: activeTab === 'builder' },
-                    { icon: Search,       label: 'Search',      action: handleSearch,                  active: false },
-                    { icon: RefreshCw,    label: 'Refresh Data',action: handleRefresh,                 active: false },
+                    { icon: PieChartIcon, label: 'Portfolio',      action: () => handleTab('portfolio'),  active: activeTab === 'portfolio' },
+                    { icon: List,         label: 'Watchlist',      action: () => handleTab('watchlist'),  active: activeTab === 'watchlist' },
+                    { icon: BarChart2,    label: 'ETF Market',     action: () => handleTab('market'),     active: activeTab === 'market' },
+                    { icon: Compass,      label: 'AI Discover',    action: handleDiscover,                active: activeTab === 'discover' },
+                    { icon: Wand2,        label: 'AI Builder',     action: handleBuilder,                 active: activeTab === 'builder' },
+                    { icon: Search,       label: 'Search',         action: handleSearch,                  active: false },
+                    { icon: RefreshCw,    label: 'Refresh Data',   action: handleRefresh,                 active: false },
                   ].map(({ icon: Icon, label, action, active }) => (
                     <button
                       key={label}

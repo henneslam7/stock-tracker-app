@@ -89,6 +89,7 @@ export function StockDrawer({
   const [tradeAmount, setTradeAmount] = useState(0);
   const [manualPrice, setManualPrice] = useState(stock.price);
   const [chartLoading, setChartLoading] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'chart' | 'ai' | 'trade'>('chart');
 
   // ── Moving averages ────────────────────────────────────────────────────────
   function computeMA(data: PricePoint[], period: number): (number | null)[] {
@@ -611,24 +612,30 @@ export function StockDrawer({
   // ── Inline full-width render ───────────────────────────────────────────────
 
   if (inline) {
+    const MOBILE_TABS = [
+      { id: 'chart' as const, label: 'Chart' },
+      { id: 'ai'    as const, label: 'Analysis' },
+      { id: 'trade' as const, label: 'Trade' },
+    ];
+
     return (
-      <div className="flex-1 flex flex-col gap-4 md:gap-6 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-3 sm:gap-4 md:gap-6 min-h-0 overflow-hidden">
         {/* Nav bar */}
-        <div className="flex items-center gap-3 md:gap-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 shrink-0 flex-wrap sm:flex-nowrap">
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-white/20 px-3 py-2 rounded-xl"
+            className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-white/20 px-3 py-2 rounded-xl shrink-0"
           >
             <ChevronLeft size={14} /> Back
           </button>
-          <div className="h-4 w-[1px] bg-white/10" />
+          <div className="h-4 w-[1px] bg-white/10 hidden sm:block" />
           <div className="flex items-baseline gap-2 md:gap-3 min-w-0 overflow-hidden">
-            <span className="text-white font-black text-lg md:text-xl shrink-0">{stock.symbol}</span>
-            <span className="text-slate-500 text-sm font-medium truncate">{stock.name}</span>
+            <span className="text-white font-black text-base sm:text-lg md:text-xl shrink-0">{stock.symbol}</span>
+            <span className="text-slate-500 text-xs sm:text-sm font-medium truncate hidden sm:block">{stock.name}</span>
             <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest shrink-0 hidden lg:block">{stock.sector}</span>
           </div>
           <div className="ml-auto text-right shrink-0">
-            <div className="text-lg md:text-xl font-black text-white">${stock.price.toFixed(2)}</div>
+            <div className="text-base sm:text-lg md:text-xl font-black text-white">${stock.price.toFixed(2)}</div>
             <div className={cn("text-xs font-black flex items-center justify-end gap-1", stock.change >= 0 ? "text-emerald-400" : "text-rose-400")}>
               {stock.change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
               {stock.change >= 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%
@@ -636,20 +643,45 @@ export function StockDrawer({
           </div>
         </div>
 
-        {/* Body: single col on mobile, 3-col on desktop */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1.1fr_0.75fr] gap-4 md:gap-6 overflow-y-auto md:overflow-hidden custom-scrollbar">
-          {/* Left / top: Chart + Stats + News */}
-          <div className="space-y-4 md:space-y-6 md:overflow-y-auto md:custom-scrollbar md:pr-1">
+        {/* Mobile tab switcher (hidden on md+) */}
+        <div className="flex md:hidden gap-1 shrink-0 bg-black/30 rounded-2xl p-1">
+          {MOBILE_TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setMobileTab(t.id)}
+              className={cn(
+                "flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all",
+                mobileTab === t.id ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body: tabbed on mobile, 3-col on desktop */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1.1fr_0.75fr] gap-3 sm:gap-4 md:gap-6 overflow-y-auto md:overflow-hidden custom-scrollbar">
+          {/* Left / Chart tab */}
+          <div className={cn(
+            "space-y-3 sm:space-y-4 md:space-y-6 md:overflow-y-auto md:custom-scrollbar md:pr-1",
+            mobileTab !== 'chart' && "hidden md:block"
+          )}>
             {ChartSection}
             {StatsSection}
             {NewsSection}
           </div>
-          {/* Center: AI Analysis */}
-          <div className="md:overflow-y-auto md:custom-scrollbar md:pr-1">
+          {/* Center / AI tab */}
+          <div className={cn(
+            "md:overflow-y-auto md:custom-scrollbar md:pr-1",
+            mobileTab !== 'ai' && "hidden md:block"
+          )}>
             {AISection}
           </div>
-          {/* Right / bottom: Position + Trade */}
-          <div className="space-y-4 md:overflow-y-auto md:custom-scrollbar md:pr-1">
+          {/* Right / Trade tab */}
+          <div className={cn(
+            "space-y-3 sm:space-y-4 md:overflow-y-auto md:custom-scrollbar md:pr-1",
+            mobileTab !== 'trade' && "hidden md:block"
+          )}>
             {PositionCard}
             {TradePanel}
           </div>

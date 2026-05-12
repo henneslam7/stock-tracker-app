@@ -1,6 +1,29 @@
 export type Sentiment = 'High' | 'Mild' | 'Low';
 export type ChartTimeframe = '1m' | '3m' | '6m' | '1y';
-export type ActiveTab = 'portfolio' | 'watchlist' | 'discover' | 'builder';
+export type ActiveTab = 'portfolio' | 'watchlist' | 'discover' | 'builder' | 'market';
+
+export interface ETFEntry {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  prevClose?: number;
+}
+
+export interface ETFSentimentData {
+  sentiment: 'Bullish' | 'Bearish' | 'Neutral' | 'Mixed';
+  score: number;
+  summary: string;
+  keySignal: string;
+}
+
+export interface ETFSentimentResponse {
+  bull: ETFEntry[];
+  bear: ETFEntry[];
+  market: Record<string, ETFEntry>;
+  sentiment: ETFSentimentData;
+  news: Array<{ title: string; url: string; date: string; source: string }>;
+}
 
 export interface Stock {
   symbol: string;
