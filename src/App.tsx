@@ -226,8 +226,12 @@ export default function App() {
           signal: hasMACDData ? `${macd.signal >= 0 ? "+" : ""}${macd.signal.toFixed(3)}` : "N/A",
         } : undefined,
       });
-    } catch {
-      showToast("Analysis failed. Try again.", "error");
+    } catch (err: any) {
+      const msg = err?.message || '';
+      showToast(
+        msg.includes('unavailable') ? "Gemini AI unavailable — try again in a moment." : "Analysis failed. Try again.",
+        "error"
+      );
     } finally {
       setIsAnalyzing(false);
     }
